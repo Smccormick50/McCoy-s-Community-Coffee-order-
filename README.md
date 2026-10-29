@@ -37,3 +37,14 @@ Product IDs, descriptions and unit prices were transcribed from Community Coffee
 8. GitHub: upload updated `index.html`, `firestore.rules`, and `README.md`. Leave your already-configured `firebase-config.js` untouched. No new Firebase project needed.
 
 **Security note:** Admin rights are enforced by Firestore rules, not just by hiding the tab. The `admins` collection is provisioned manually in Firebase Console; browser clients cannot write their own admin status. For production use, consider additional protections around catalog fields and historical order integrity.
+
+
+## Version 3: auto-generated purchase orders
+- Order dates default to today's local date and are editable.
+- Requested by fills from the logged-in user's Firebase display name or email; it is read-only.
+- On first **Save order**, a Firestore transaction assigns sequential PO numbers starting at **9001** using `settings/poCounter`. Subsequent edits keep the original number.
+- **Create PDF** and **Email PDF** require saving the new order first. They load jsPDF with a backup CDN if necessary.
+- **IMPORTANT:** Publish the NEW `firestore.rules` in Firebase console. GitHub upload alone does not deploy database rules.
+- If Firestore already contains numbered orders from another numbering system, reconcile those manually before first use to avoid collisions.
+- The counter is protected against non-incrementing updates, but signed-in employees can still increment it; use a server-side Cloud Function for audited/tamper-proof numbering.
+- Existing `firebase-config.js` in your live GitHub project MUST be retained when uploading this ZIP. The packaged config remains a placeholder.

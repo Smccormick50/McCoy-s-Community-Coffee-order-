@@ -15,11 +15,18 @@ service cloud.firestore {
         && (request.resource.data.category != 'free' || request.resource.data.price == 0);
       allow delete: if false;
     }
+    match /settings/{settingId} {
+      allow read: if signedIn() && settingId == 'poCounter';
+      allow create: if signedIn() && settingId == 'poCounter' && request.resource.data.keys().hasOnly(['lastNumber']) && request.resource.data.lastNumber == 9001;
+      allow update: if signedIn() && settingId == 'poCounter' && request.resource.data.keys().hasOnly(['lastNumber']) && request.resource.data.lastNumber == resource.data.lastNumber + 1;
+      allow delete: if false;
+    }
     match /orders/{orderId} {
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status == 'Draft';
+        && request.resource.data.status == 'Draft'
+        && request.resource.data.poNumber == getAfter(/databases/$(database)/documents/settings/poCounter).data.lastNumber;
       allow update: if signedIn()
         && request.resource.data.createdBy == resource.data.createdBy
         && (admin() || resource.data.createdBy == request.auth.uid);
