@@ -1,4 +1,4 @@
-const firebaseConfig = {
+export default {
   apiKey: "AIzaSyDTQ3kSceAe9D5wnwneF2q_Z_AzzGCbVjo",
   authDomain: "mccoy-s-community-coffee.firebaseapp.com",
   projectId: "mccoy-s-community-coffee",
