@@ -72,14 +72,20 @@ details.year>.inner details.group{background:#fff}
 .tile span{font-size:.68rem;letter-spacing:.06em;color:#64766c;text-transform:uppercase}
 .tile b{display:block;font-size:1.15rem;margin-top:2px}
 .table-wrap{overflow-x:auto;border-radius:8px;-webkit-overflow-scrolling:touch}
-table.results{width:100%;border-collapse:collapse;font-size:.84rem;min-width:900px}
+table.results{width:100%;border-collapse:collapse;font-size:.84rem;min-width:720px}
 table.results th{background:#00543b;color:#ffd200;text-align:left;padding:10px 8px;white-space:nowrap}
 table.results td{padding:8px;border-bottom:1px solid #e4ebe7;vertical-align:top}
 table.results .num{text-align:right;white-space:nowrap}
 table.results td.bad{color:#a12525;font-weight:800}
-table.results td:nth-child(4){min-width:180px}table.results td.store{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.results tr.po-row{cursor:pointer}table.results tr.po-row:hover td,table.results tr.po-row.open td{background:#f4faf6}table.results td.caret{width:18px;color:#00543b;font-size:.9rem}table.results td.acts{white-space:nowrap}table.results td.acts button{margin-right:4px}table.results td.rs.bad{color:#a12525;font-weight:700}table.results td.rs.ok{color:#17663a;font-weight:700}table.results td.rs.pend{color:#64766c}table.results tr.detail>td{background:#f8fbf9;border-bottom:2px solid #c8dbcf;padding:4px 8px 14px}.po-detail{border-left:3px solid #00543b;padding-left:12px}table.items{width:100%;border-collapse:collapse;font-size:.82rem;background:#fff}table.items th{background:#e4efe9;color:#00543b;text-align:left;padding:6px 8px}table.items td{padding:6px 8px;border-bottom:1px solid #e4ebe7}table.items .num{text-align:right}table.items td.bad{color:#a12525;font-weight:800}table.items td.okc{color:#17663a;font-weight:700}table.items tr.hit td{background:#fffbe6}table.results td.store{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 table.results button{padding:6px 9px;font-size:.8rem}
 table.results tfoot td{font-weight:800;background:#f1f8f3}
+.modal{position:fixed;inset:0;background:#0b1f18b3;z-index:50;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal-box{background:#fff;border-radius:14px;width:min(980px,100%);height:min(94vh,1150px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px #0005}
+.modal-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #dbe5df;flex-wrap:wrap}
+.modal-bar b{overflow-wrap:anywhere}
+.modal iframe{flex:1;border:0;width:100%;background:#525659}
+body.noscroll{overflow:hidden}
 @media(max-width:620px){.grid,.grid3{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:1fr 80px}.admin-row{grid-template-columns:1fr 95px}.recv-row{grid-template-columns:1fr 90px}}
 </style>
 </head>
@@ -116,10 +122,10 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 <h2 style="margin-top:20px">Free merchandise</h2><p class="muted">No-charge items shown separately. Availability must be confirmed with Community Coffee.</p>
 <div id="freeItems"></div>
 <div class="total"><span id="units">0 units</span><span id="total">$0.00</span></div>
-<div class="actions"><button id="saveOrder">Save order</button><button class="secondary" id="pdfOrder">Save &amp; create PDF</button><button class="secondary" id="emailOrder">Save &amp; email PDF</button><button class="gold hidden" id="receiveFromForm">Log receiving</button><button class="secondary" id="clearOrder">Clear form</button></div>
+<div class="actions"><button id="saveOrder">Save order</button><button class="secondary" id="pdfOrder">Save &amp; view PDF</button><button class="secondary" id="emailOrder">Save &amp; email PDF</button><button class="gold hidden" id="receiveFromForm">Log receiving</button><button class="secondary" id="clearOrder">Clear form</button></div>
 <p id="message" role="status"></p>
 <div class="actions"><button class="gold hidden" id="markSent"></button></div>
-<p class="note" id="formNote">Create PDF and Email PDF save the order automatically first, then the form clears for the next order. Email PDF downloads the PDF and opens your email app addressed to Community Coffee. Attach the downloaded PDF before sending, then mark the PO as <b>Sent</b> to lock it.</p>
+<p class="note" id="formNote">Save &amp; view PDF and Save &amp; email PDF save the order automatically first, then the form clears for the next order. Email PDF downloads the PDF and opens your email app addressed to Community Coffee. Attach the downloaded PDF before sending, then mark the PO as <b>Sent</b> to lock it.</p>
 </div>
 </section>
 
@@ -135,7 +141,7 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 <!-- PO SEARCH -->
 <section id="search" class="panel hidden">
 <h2>PO Search &amp; Reporting</h2>
-<p class="muted">Filter purchase order history by product, store, requester, status, PO, receiving variance, or date range. Export the filtered results.</p>
+<p class="muted">Find POs by product, store, requester, status, PO, receiving variance, or date range. Click a PO to see its items and variances. Export the filtered results.</p>
 <div class="grid3">
 <div><label for="sProduct">Product</label><select id="sProduct"><option value="">All products</option></select></div>
 <div><label for="sStore">Store / ship to</label><select id="sStore"><option value="">All stores</option></select></div>
@@ -147,10 +153,10 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 <div><label for="sTo">To date</label><input id="sTo" type="date"></div>
 <div><label for="sKeyword">Keyword</label><input id="sKeyword" placeholder="Description, notes…"></div>
 </div>
-<div class="actions" style="margin-top:14px"><button id="sRun">Search</button><button class="gold" id="sClear">Clear</button><button class="gold" id="sExcel">Export Excel</button><button class="gold" id="sPdf">Export PDF</button></div>
+<div class="actions" style="margin-top:14px"><button id="sRun">Search</button><button class="gold" id="sClear">Clear</button><button class="gold" id="sExcel">Export Excel</button><button class="gold" id="sPdf">View PDF report</button></div>
 <p id="searchMessage" role="status" class="muted"></p>
-<div class="tiles"><div class="tile"><span>POs</span><b id="tPos">0</b></div><div class="tile"><span>Units</span><b id="tUnits">0</b></div><div class="tile"><span>Value</span><b id="tValue">$0.00</b></div><div class="tile"><span>Rows</span><b id="tRows">0</b></div></div>
-<div class="table-wrap"><table class="results"><thead><tr><th>Date</th><th>PO</th><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Rcvd</th><th class="num">Unit</th><th class="num">Extended</th><th>Store</th><th>Requested by</th><th>Status</th><th>Action</th></tr></thead><tbody id="sBody"></tbody><tfoot id="sFoot"></tfoot></table></div>
+<div class="tiles"><div class="tile"><span>POs</span><b id="tPos">0</b></div><div class="tile"><span id="tUnitsL">Units</span><b id="tUnits">0</b></div><div class="tile"><span id="tValueL">Value</span><b id="tValue">$0.00</b></div><div class="tile"><span>With variance</span><b id="tVar">0</b></div></div>
+<div class="table-wrap"><table class="results"><thead><tr><th></th><th>Date</th><th>PO</th><th>Requested by</th><th class="num">Lines</th><th class="num">Units</th><th class="num">Rcvd</th><th class="num">Value</th><th>Status</th><th>Receiving</th><th>Action</th></tr></thead><tbody id="sBody"></tbody><tfoot id="sFoot"></tfoot></table></div>
 </section>
 
 <!-- RECEIVING -->
@@ -187,6 +193,7 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 </section>
 </div>
 </main>
+<div id="pdfModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfTitle"><div class="modal-box"><div class="modal-bar"><b id="pdfTitle">PDF preview</b><div class="actions"><button id="pdfDownload">Download</button><button class="secondary" id="pdfOpen">Open in new tab</button><button class="secondary" id="pdfClose">Close</button></div></div><iframe id="pdfFrame" title="PDF preview"></iframe></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -287,7 +294,7 @@ function setLocked(on,reason=''){
  for(const id of ['orderDate','shipTo','notes'])$(id).disabled=on;
  $('lockBanner').textContent=reason;$('lockBanner').classList.toggle('hidden',!on);
  $('saveOrder').classList.toggle('hidden',on);
- $('pdfOrder').textContent=on?'Create PDF':'Save & create PDF';
+ $('pdfOrder').textContent=on?'View PDF':'Save & view PDF';
  $('emailOrder').textContent=on?'Email PDF':'Save & email PDF';
  $('clearOrder').textContent=on?'Start new order':'Clear form';
  $('formNote').classList.toggle('hidden',on);$('productsHint').classList.toggle('hidden',on);
@@ -378,8 +385,17 @@ async function pdf(o){
  if(o.notes){y+=6;para('Order notes: '+o.notes)}
  footer(d,'Catalog prices are estimates. Confirm free goods and pricing with Community Coffee.');
  const filename='Community-Coffee-PO-'+String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')+(rec?'-received':'')+'.pdf';
- d.save(filename);return filename;
+ return {d,filename};
 }
+let pdfUrl=null,pdfName='';
+function showPdf({d,filename}){
+ if(pdfUrl)URL.revokeObjectURL(pdfUrl);
+ pdfUrl=URL.createObjectURL(d.output('blob'));pdfName=filename;
+ $('pdfTitle').textContent=filename;$('pdfFrame').src=pdfUrl;
+ $('pdfModal').classList.remove('hidden');document.body.classList.add('noscroll');$('pdfDownload').focus();
+}
+function closePdf(){$('pdfModal').classList.add('hidden');document.body.classList.remove('noscroll');$('pdfFrame').src='about:blank';if(pdfUrl){const old=pdfUrl;pdfUrl=null;setTimeout(()=>URL.revokeObjectURL(old),500)}}
+function downloadPdf(){if(!pdfUrl)return;const a=document.createElement('a');a.href=pdfUrl;a.download=pdfName;document.body.append(a);a.click();a.remove()}
 function email(o){
  const to=vendorEmail.split(',').map(s=>s.trim()).filter(Boolean).join(',');
  const subject="McCoy's Community Coffee PO "+o.poNumber;
@@ -408,7 +424,7 @@ function orderCard(o){
  const det=document.createElement('div');det.className='muted';
  det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
  const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
- const b2=document.createElement('button');b2.className='secondary';b2.textContent='PDF';b2.onclick=async()=>{try{await ensurePdf();await pdf(o)}catch(e){alert(e.message)}};div.append(b2);
+ const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o))}catch(e){alert(e.message)}};div.append(b2);
  if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
  const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
  for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
@@ -490,11 +506,19 @@ function refreshSearchOptions(){
  fill('sStore',uniq(o=>o.shipTo).map(s=>[s,shortStore(s)]),'All stores');
  fill('sRequester',uniq(o=>o.requester).map(s=>[s,s]),'All requesters');
 }
+const searchExpanded=new Set();
+function recvSummary(o){
+ if(!o.receiving)return {text:statusOf(o)==='Received'?'No receiving log':'Not received',cls:'pend',short:0,over:0,lines:[]};
+ const lines=(o.receiving.lines||[]).filter(l=>l.received!==l.ordered);
+ const short=lines.reduce((s,l)=>s+Math.max(0,l.ordered-l.received),0),over=lines.reduce((s,l)=>s+Math.max(0,l.received-l.ordered),0);
+ if(!lines.length)return {text:'Complete',cls:'ok',short,over,lines};
+ return {text:[short?short+' short':'',over?over+' over':''].filter(Boolean).join(', '),cls:'bad',short,over,lines};
+}
 function runSearch(){
  const f={product:$('sProduct').value,store:$('sStore').value,req:$('sRequester').value,status:$('sStatus').value,po:$('sPo').value.trim(),variance:$('sVariance').value,from:$('sFrom').value,to:$('sTo').value,kw:$('sKeyword').value.trim().toLowerCase()};
  if(f.from&&f.to&&f.from>f.to){$('searchMessage').textContent='From date is after To date.';$('searchMessage').className='error';return}
  $('searchMessage').textContent='';$('searchMessage').className='muted';
- const rows=[];
+ const results=[];
  for(const o of history){
   const date=orderDateStr(o),st=statusOf(o);
   if(f.from&&date<f.from||f.to&&date>f.to)continue;
@@ -504,26 +528,54 @@ function runSearch(){
   if(f.po&&!String(o.poNumber).includes(f.po))continue;
   if(f.variance==='yes'&&!o.hasVariance||f.variance==='no'&&!(o.receiving&&!o.hasVariance)||f.variance==='pending'&&o.receiving)continue;
   const rec=Object.fromEntries((o.receiving?.lines||[]).map(l=>[l.id,l]));
-  for(const l of o.lines||[]){
-   if(f.product&&l.id!==f.product)continue;
-   if(f.kw&&![l.id,l.description,o.notes,o.receiving?.notes,rec[l.id]?.note,o.poNumber].join(' ').toLowerCase().includes(f.kw))continue;
-   rows.push({o,date,po:o.poNumber,id:l.id,desc:l.description,qty:l.qty,rcvd:rec[l.id]?rec[l.id].received:null,note:rec[l.id]?.note||'',unit:l.unitPrice,ext:round2(l.qty*l.unitPrice),store:o.shipTo||'',requester:o.requester||'',status:st});
-  }
+  const lines=o.lines||[];
+  const matched=lines.filter(l=>(!f.product||l.id===f.product)&&(!f.kw||[l.id,l.description,rec[l.id]?.note].join(' ').toLowerCase().includes(f.kw)));
+  const poKw=f.kw&&[o.notes,o.receiving?.notes,o.poNumber,o.requester].join(' ').toLowerCase().includes(f.kw);
+  if(f.product&&!matched.length)continue;
+  if(f.kw&&!matched.length&&!poKw)continue;
+  const rs=recvSummary(o);
+  results.push({o,date,st,matchedIds:new Set((f.product||f.kw)?matched.map(l=>l.id):[]),productUnits:f.product?matched.reduce((s,l)=>s+l.qty,0):0,productValue:f.product?matched.reduce((s,l)=>s+l.qty*l.unitPrice,0):0,lineCount:lines.length,units:Number(o.units)||0,value:Number(o.total)||0,rcvdUnits:o.receiving?(o.receiving.lines||[]).reduce((s,l)=>s+l.received,0):null,rs});
  }
- rows.sort((a,b)=>b.date.localeCompare(a.date)||Number(b.po)-Number(a.po)||byItem(a,b));
- lastSearch=rows;
- const pos=new Set(rows.map(r=>r.o.id)).size,units=rows.reduce((s,r)=>s+r.qty,0),value=round2(rows.reduce((s,r)=>s+r.ext,0));
- $('tPos').textContent=pos;$('tUnits').textContent=units;$('tValue').textContent=money(value);$('tRows').textContent=rows.length;
+ results.sort((a,b)=>b.date.localeCompare(a.date)||Number(b.o.poNumber)-Number(a.o.poNumber));
+ lastSearch=results;
+ const units=results.reduce((s,r)=>s+r.units,0),value=round2(results.reduce((s,r)=>s+r.value,0)),withVar=results.filter(r=>r.rs.cls==='bad').length;
+ $('tPos').textContent=results.length;
+ if(f.product){$('tUnitsL').textContent='Units of this product';$('tUnits').textContent=results.reduce((s,r)=>s+r.productUnits,0);$('tValueL').textContent='Value of this product';$('tValue').textContent=money(results.reduce((s,r)=>s+r.productValue,0))}
+ else{$('tUnitsL').textContent='Units';$('tUnits').textContent=units;$('tValueL').textContent='Value';$('tValue').textContent=money(value)}
+ $('tVar').textContent=withVar;
+ renderSearchTable(f);
+}
+function renderSearchTable(f){
  const body=$('sBody');body.replaceChildren();
- if(!rows.length){body.innerHTML='<tr><td colspan="12" class="muted">No matching PO lines.</td></tr>';$('sFoot').innerHTML='';return}
+ const rows=lastSearch;
+ if(!rows.length){body.innerHTML='<tr><td colspan="11" class="muted">No matching POs.</td></tr>';$('sFoot').innerHTML='';return}
  for(const r of rows){
-  const tr=document.createElement('tr');
-  const varCls=r.rcvd!=null&&r.rcvd!==r.qty?' bad':'';
-  tr.innerHTML=`<td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.po)}</b></td><td>${esc(r.id)}</td><td>${esc(r.desc)}</td><td class="num">${r.qty}</td><td class="num${varCls}" title="${esc(r.note)}">${r.rcvd==null?'—':r.rcvd}</td><td class="num">${money(r.unit)}</td><td class="num">${money(r.ext)}</td><td class="store" title="${esc(r.store)}">${esc(shortStore(r.store))}</td><td>${esc(r.requester)}</td><td><span class="pill ${esc(r.status)}" style="margin:0">${esc(r.status)}</span></td><td></td>`;
-  const b=document.createElement('button');b.textContent='Open';b.onclick=()=>load(r.o);tr.lastElementChild.append(b);
+  const o=r.o,open=searchExpanded.has(o.id);
+  const tr=document.createElement('tr');tr.className='po-row'+(open?' open':'');
+  tr.innerHTML=`<td class="caret">${open?'&#9662;':'&#9656;'}</td><td>${esc(fmtDate(r.date))}</td><td><b>${esc(o.poNumber)}</b></td><td>${esc(o.requester)}</td><td class="num">${r.lineCount}</td><td class="num">${r.units}</td><td class="num${r.rcvdUnits!=null&&r.rcvdUnits!==r.units?' bad':''}">${r.rcvdUnits==null?'—':r.rcvdUnits}</td><td class="num">${money(r.value)}</td><td><span class="pill ${esc(r.st)}" style="margin:0">${esc(r.st)}</span></td><td class="rs ${r.rs.cls}">${esc(r.rs.text)}</td><td class="acts"></td>`;
+  const acts=tr.lastElementChild;
+  const bOpen=document.createElement('button');bOpen.textContent='Open';bOpen.onclick=e=>{e.stopPropagation();load(o)};
+  const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o))}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
+  acts.append(bOpen,bPdf);
+  const toggle=()=>{open?searchExpanded.delete(o.id):searchExpanded.add(o.id);renderSearchTable(f)};
+  tr.onclick=toggle;tr.title=open?'Click to hide items':'Click to show items';
   body.append(tr);
+  if(open)body.append(poDetailRow(r));
  }
- $('sFoot').innerHTML=`<tr><td colspan="4">Totals</td><td class="num">${units}</td><td></td><td></td><td class="num">${money(value)}</td><td colspan="4"></td></tr>`;
+ const units=rows.reduce((s,r)=>s+r.units,0),value=rows.reduce((s,r)=>s+r.value,0);
+ $('sFoot').innerHTML=`<tr><td></td><td colspan="4">${rows.length} PO${rows.length===1?'':'s'}</td><td class="num">${units}</td><td></td><td class="num">${money(value)}</td><td colspan="3"></td></tr>`;
+}
+function poDetailRow(r){
+ const o=r.o,rec=Object.fromEntries((o.receiving?.lines||[]).map(l=>[l.id,l]));
+ const tr=document.createElement('tr');tr.className='detail';
+ const items=(o.lines||[]).map(l=>{const rl=rec[l.id];const diff=rl?rl.received-l.qty:0;const v=!rl?'—':diff<0?`Short ${-diff}`:diff>0?`Over ${diff}`:'OK';
+  return `<tr class="${r.matchedIds.has(l.id)?'hit':''}"><td>${esc(l.id)}</td><td>${esc(l.description)}${l.category==='free'?' <span class="pill" style="margin:0 0 0 4px">FREE</span>':''}</td><td class="num">${l.qty}</td><td class="num${rl&&diff?' bad':''}">${rl?rl.received:'—'}</td><td class="${rl&&diff?'bad':rl?'okc':''}">${v}</td><td class="num">${money(l.unitPrice)}</td><td class="num">${money(l.qty*l.unitPrice)}</td><td>${esc(rl?.note||'')}</td></tr>`}).join('');
+ const info=[];
+ if(o.sentAt?.toDate)info.push('Sent '+o.sentAt.toDate().toLocaleDateString()+(o.sentBy?' by '+o.sentBy:''));
+ if(o.receiving)info.push(`Received ${fmtDate(o.receiving.date)} by ${o.receiving.by}`);
+ const notes=[o.notes?'<b>Order notes:</b> '+esc(o.notes):'',o.receiving?.notes?'<b>Receiving notes:</b> '+esc(o.receiving.notes):''].filter(Boolean).join('<br>');
+ tr.innerHTML=`<td></td><td colspan="10"><div class="po-detail"><div class="muted" style="margin-bottom:6px">${esc(o.shipTo||'')}${info.length?' · '+esc(info.join(' · ')):''}</div><table class="items"><thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received</th><th>Variance</th><th class="num">Unit</th><th class="num">Extended</th><th>Note</th></tr></thead><tbody>${items}</tbody></table>${notes?`<p style="margin:8px 0 0;font-size:.84rem">${notes}</p>`:''}</div></td>`;
+ return tr;
 }
 function searchFilterText(){
  const parts=[];const sel=id=>$(id).selectedOptions[0]?.textContent;
@@ -533,45 +585,53 @@ function searchFilterText(){
 function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 async function exportExcel(){
  if(!lastSearch.length)throw Error('Run a search with results first.');
- const data=lastSearch.map(r=>({'Date':fmtDate(r.date),'PO #':Number(r.po)||String(r.po),'Item':r.id,'Description':r.desc,'Qty ordered':r.qty,'Qty received':r.rcvd??'','Variance':r.rcvd==null?'':r.rcvd-r.qty,'Unit price':r.unit,'Extended':r.ext,'Ship to':r.store,'Requested by':r.requester,'Status':r.status,'Receiving note':r.note}));
+ const poRows=lastSearch.map(r=>({'Date':fmtDate(r.date),'PO #':Number(r.o.poNumber)||String(r.o.poNumber),'Ship to':r.o.shipTo||'','Requested by':r.o.requester||'','Status':r.st,'Lines':r.lineCount,'Units ordered':r.units,'Units received':r.rcvdUnits??'','Value':r.value,'Receiving':r.rs.text,'Received date':r.o.receiving?fmtDate(r.o.receiving.date):'','Received by':r.o.receiving?.by||'','Order notes':r.o.notes||'','Receiving notes':r.o.receiving?.notes||''}));
+ const lineRows=[];
+ for(const r of lastSearch){const rec=Object.fromEntries((r.o.receiving?.lines||[]).map(l=>[l.id,l]));for(const l of r.o.lines||[]){const rl=rec[l.id];lineRows.push({'Date':fmtDate(r.date),'PO #':Number(r.o.poNumber)||String(r.o.poNumber),'Item':l.id,'Description':l.description,'Qty ordered':l.qty,'Qty received':rl?rl.received:'','Variance':rl?rl.received-l.qty:'','Unit price':l.unitPrice,'Extended':round2(l.qty*l.unitPrice),'Status':r.st,'Variance note':rl?.note||''})}}
  const name='Coffee-PO-Search-'+todayLocal();
  try{
   await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
-  const ws=XLSX.utils.json_to_sheet(data);ws['!cols']=[10,8,9,34,11,12,9,10,11,40,18,10,30].map(w=>({wch:w}));
-  const n=data.length+1;for(let r=2;r<=n;r++)for(const c of ['H','I']){const cell=ws[c+r];if(cell)cell.z='$#,##0.00'}
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'PO lines');XLSX.writeFile(wb,name+'.xlsx');
-  $('searchMessage').textContent='Excel file downloaded.';
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.json_to_sheet(poRows);ws1['!cols']=[10,8,40,18,10,7,13,14,11,24,13,18,30,30].map(w=>({wch:w}));for(let i=2;i<=poRows.length+1;i++)if(ws1['I'+i])ws1['I'+i].z='$#,##0.00';
+  const ws2=XLSX.utils.json_to_sheet(lineRows);ws2['!cols']=[10,8,9,34,11,12,9,10,11,10,30].map(w=>({wch:w}));for(let i=2;i<=lineRows.length+1;i++)for(const c of ['H','I'])if(ws2[c+i])ws2[c+i].z='$#,##0.00';
+  XLSX.utils.book_append_sheet(wb,ws1,'POs');XLSX.utils.book_append_sheet(wb,ws2,'PO items');XLSX.writeFile(wb,name+'.xlsx');
+  $('searchMessage').textContent='Excel file downloaded (sheets: POs and PO items).';
  }catch(e){
   console.warn('SheetJS unavailable, exporting CSV',e);
-  const cols=Object.keys(data[0]),q=v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
-  downloadBlob(new Blob(['﻿'+[cols.join(','),...data.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n')],{type:'text/csv'}),name+'.csv');
-  $('searchMessage').textContent='Excel library unavailable, so a CSV file (opens in Excel) was downloaded instead.';
+  const cols=Object.keys(poRows[0]),q=v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  downloadBlob(new Blob(['﻿'+[cols.join(','),...poRows.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n')],{type:'text/csv'}),name+'.csv');
+  $('searchMessage').textContent='Excel library unavailable, so a CSV of the POs (opens in Excel) was downloaded instead.';
  }
 }
 async function exportSearchPdf(){
  if(!lastSearch.length)throw Error('Run a search with results first.');
  await ensurePdf();
  const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'landscape'});const L=30,R=762,BOTTOM=548;let y=40;
- d.setTextColor(25,53,45);d.setFont('helvetica','bold');d.setFontSize(15);d.text("McCoy's - Community Coffee PO Search Report",L,y);y+=18;
+ const ink=()=>d.setTextColor(25,53,45),red=()=>d.setTextColor(161,37,37);
+ ink();d.setFont('helvetica','bold');d.setFontSize(15);d.text("McCoy's - Community Coffee PO Search Report",L,y);y+=18;
  d.setFont('helvetica','normal');d.setFontSize(9);d.text(pdfSafe(`Generated ${new Date().toLocaleString()} by ${employeeName(currentUser)}`),L,y);y+=13;
  const ft=d.splitTextToSize(pdfSafe('Filters: '+searchFilterText()),R-L);d.text(ft,L,y);y+=ft.length*11+4;
- const pos=new Set(lastSearch.map(r=>r.o.id)).size,units=lastSearch.reduce((s,r)=>s+r.qty,0),value=lastSearch.reduce((s,r)=>s+r.ext,0);
- d.setFont('helvetica','bold');d.text(`POs: ${pos}     Lines: ${lastSearch.length}     Units: ${units}     Value: ${money(value)}`,L,y);y+=16;
- const C={date:L,po:84,item:122,desc:166,descW:214,qty:418,rcvd:456,unit:512,ext:574,req:584,reqW:92,status:684};
- const head=()=>{d.setFillColor(0,84,59);d.rect(L,y-11,R-L,17,'F');d.setTextColor(255,210,0);d.setFont('helvetica','bold');d.setFontSize(8.5);d.text('DATE',C.date+3,y);d.text('PO',C.po,y);d.text('ITEM',C.item,y);d.text('DESCRIPTION',C.desc,y);d.text('QTY',C.qty,y,{align:'right'});d.text('RCVD',C.rcvd,y,{align:'right'});d.text('UNIT',C.unit,y,{align:'right'});d.text('EXTENDED',C.ext,y,{align:'right'});d.text('REQUESTED BY',C.req,y);d.text('STATUS',C.status,y);y+=17;d.setTextColor(25,53,45);d.setFont('helvetica','normal');d.setFontSize(8.5)};
+ const units=lastSearch.reduce((s,r)=>s+r.units,0),value=lastSearch.reduce((s,r)=>s+r.value,0),withVar=lastSearch.filter(r=>r.rs.cls==='bad').length;
+ d.setFont('helvetica','bold');d.text(`POs: ${lastSearch.length}     Units: ${units}     Value: ${money(value)}     With variance: ${withVar}`,L,y);y+=16;
+ const C={date:L+3,po:88,store:126,storeW:150,req:284,reqW:100,status:392,lines:470,units:510,rcvd:550,value:620,recv:632,recvW:R-632};
+ const head=()=>{d.setFillColor(0,84,59);d.rect(L,y-11,R-L,17,'F');d.setTextColor(255,210,0);d.setFont('helvetica','bold');d.setFontSize(8.5);d.text('DATE',C.date,y);d.text('PO',C.po,y);d.text('SHIP TO',C.store,y);d.text('REQUESTED BY',C.req,y);d.text('STATUS',C.status,y);d.text('LINES',C.lines,y,{align:'right'});d.text('UNITS',C.units,y,{align:'right'});d.text('RCVD',C.rcvd,y,{align:'right'});d.text('VALUE',C.value,y,{align:'right'});d.text('RECEIVING',C.recv,y);y+=17;ink();d.setFont('helvetica','normal');d.setFontSize(8.5)};
  head();
  for(const r of lastSearch){
-  const desc=d.splitTextToSize(pdfSafe(r.desc),C.descW),req=d.splitTextToSize(pdfSafe(r.requester),C.reqW),h=Math.max(desc.length,req.length)*10.5+5;
+  const o=r.o,store=d.splitTextToSize(pdfSafe(shortStore(o.shipTo)),C.storeW),req=d.splitTextToSize(pdfSafe(o.requester),C.reqW),rv=d.splitTextToSize(pdfSafe(r.rs.text),C.recvW);
+  const varLines=r.rs.lines.map(l=>{const diff=l.received-l.ordered;return pdfSafe(`${l.id}  ${l.description}: ordered ${l.ordered}, received ${l.received} (${diff<0?'short '+(-diff):'over '+diff})${l.note?' - '+l.note:''}`)}).flatMap(t=>d.splitTextToSize(t,R-C.store-10));
+  const h=Math.max(store.length,req.length,rv.length)*10.5+5+varLines.length*10;
   if(y+h>BOTTOM){d.addPage();y=40;head()}
-  d.text(fmtDate(r.date),C.date+3,y);d.text(String(r.po),C.po,y);d.text(pdfSafe(r.id).slice(0,10),C.item,y);d.text(desc,C.desc,y);d.text(String(r.qty),C.qty,y,{align:'right'});
-  if(r.rcvd!=null){if(r.rcvd!==r.qty){d.setTextColor(161,37,37);d.setFont('helvetica','bold')}d.text(String(r.rcvd),C.rcvd,y,{align:'right'});d.setTextColor(25,53,45);d.setFont('helvetica','normal')}else d.text('-',C.rcvd,y,{align:'right'});
-  d.text(money(r.unit),C.unit,y,{align:'right'});d.text(money(r.ext),C.ext,y,{align:'right'});d.text(req,C.req,y);d.text(r.status,C.status,y);
+  d.text(fmtDate(r.date),C.date,y);d.setFont('helvetica','bold');d.text(String(o.poNumber),C.po,y);d.setFont('helvetica','normal');d.text(store,C.store,y);d.text(req,C.req,y);d.text(r.st,C.status,y);d.text(String(r.lineCount),C.lines,y,{align:'right'});d.text(String(r.units),C.units,y,{align:'right'});
+  if(r.rcvdUnits!=null){if(r.rcvdUnits!==r.units){red();d.setFont('helvetica','bold')}d.text(String(r.rcvdUnits),C.rcvd,y,{align:'right'});ink();d.setFont('helvetica','normal')}else d.text('-',C.rcvd,y,{align:'right'});
+  d.text(money(r.value),C.value,y,{align:'right'});if(r.rs.cls==='bad')red();d.text(rv,C.recv,y);ink();
+  let yy=y+Math.max(store.length,req.length,rv.length)*10.5;
+  if(varLines.length){red();d.setFontSize(8);for(const t of varLines){d.text(t,C.store+10,yy);yy+=10}ink();d.setFontSize(8.5)}
   y+=h;d.setDrawColor(228,235,231);d.line(L,y-9,R,y-9);
  }
  if(y+20>BOTTOM){d.addPage();y=40}
- d.setDrawColor(0,84,59);d.line(L,y-6,R,y-6);d.setFont('helvetica','bold');d.text('TOTALS',C.date+3,y+6);d.text(String(units),C.qty,y+6,{align:'right'});d.text(money(value),C.ext,y+6,{align:'right'});
- footer(d,'Prices shown are the unit prices stored on each PO. Estimates only.');
- d.save('Coffee-PO-Search-'+todayLocal()+'.pdf');$('searchMessage').textContent='PDF report downloaded.';
+ d.setDrawColor(0,84,59);d.line(L,y-6,R,y-6);d.setFont('helvetica','bold');d.text(`TOTALS (${lastSearch.length} POs)`,C.date,y+6);d.text(String(units),C.units,y+6,{align:'right'});d.text(money(value),C.value,y+6,{align:'right'});
+ footer(d,'Values are the PO estimated totals stored on each PO.');
+ showPdf({d,filename:'Coffee-PO-Search-'+todayLocal()+'.pdf'});$('searchMessage').textContent='PDF report opened.';
 }
 
 /* ---------- admin ---------- */
@@ -641,13 +701,15 @@ $('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').t
 $('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
 $('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
 $('saveOrder').onclick=guard($('saveOrder'),save,e=>msg(friendly(e),true));
-$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);msg((saved?'PO '+order.poNumber+' saved and ':'PO '+order.poNumber+' ')+'PDF downloaded. Check your downloads.'+(saved?' Form cleared for the next order.':''))},e=>msg(friendly(e),true));
-$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(friendly(e),true));
+$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();showPdf(await pdf(order));msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF opened. Use Download in the viewer to save a copy.'+(saved?' Form cleared for the next order.':''))},e=>msg(friendly(e),true));
+$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();const r=await pdf(order);r.d.save(r.filename);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(friendly(e),true));
 $('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+friendly(e),true));
 $('receiveFromForm').onclick=()=>lockedOrder&&openReceiving(lockedOrder);
 $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Receiving save failed',e);$('recvMessage').textContent=friendly(e);$('recvMessage').className='error'});
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
+$('pdfClose').onclick=closePdf;$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
+$('pdfModal').addEventListener('click',e=>{if(e.target===$('pdfModal'))closePdf()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('pdfModal').classList.contains('hidden'))closePdf()});
 for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});
 $('sClear').onclick=()=>{for(const id of ['sProduct','sStore','sRequester','sStatus','sPo','sVariance','sFrom','sTo','sKeyword'])$(id).value='';runSearch()};
 $('sExcel').onclick=guard($('sExcel'),exportExcel,e=>{$('searchMessage').textContent=e.message;$('searchMessage').className='error'});
