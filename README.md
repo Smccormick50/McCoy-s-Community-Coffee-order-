@@ -98,3 +98,22 @@ Upload the entire package to GitHub, but **keep your current configured firebase
 **iPhone Safari**: Share > Add to Home Screen. If an older icon is cached, remove the previous home-screen shortcut and add it again.
 
 Note: the manifest and icons make the site eligible for a branded install; browser/version/OS control the exact shortcut icon shown.
+
+
+## Version 12: locking, receiving variances, grouped history, PO Search
+
+**Deploy:** upload `index.html` and `README.md` to GitHub and keep your configured `firebase-config.js`. **You must also publish the new `firestore.rules`** (Firebase Console > Firestore Database > Rules > Publish). The new app will not work correctly with the old rules.
+
+- **Anyone can change status.** Any signed-in employee can mark any PO Sent, Received or Cancelled. Only admins can move a PO back to Draft, which unlocks it.
+- **Sent POs are locked.** Once a PO is Sent, Received or Cancelled, its products, quantities, prices, date, ship-to and notes cannot be changed. This is enforced by the database rules. After saving or emailing, use the **Mark PO … as Sent** button, or the status menu in Order history.
+- **Receiving and variances.** On a Sent PO, choose **Log receiving**. Enter the quantity actually received per line, plus a note for each difference and general receiving notes. Saving sets the status to Received and flags the PO if anything was short or over. The received PDF adds a RCVD column, shows variances in red, and adds a Receiving section. Receiving can be edited later. The original ordered quantities never change.
+- **Old orders keep their saved product names and prices** when viewed, edited or printed.
+- **No skipped PO numbers.** New POs are stored with the PO number as their document ID, and the rules only let the counter advance in the same save that creates that PO. Older orders keep working as before.
+- **Vendor email.** Admin > Vendor email. Email PDF drafts are addressed to it automatically.
+- **PDF.** Long product names wrap instead of being cut off, columns line up, and pages are numbered.
+- **Read-only fields** (PO number, Requested by) are shaded gray.
+- **Auto-save.** **Save & create PDF** and **Save & email PDF** save the order first, then create the PDF. There's no need to press Save order first.
+- **Order history.** This month is listed in full. Earlier months this year fold into one line each, and earlier years fold into one line per year with the months inside. Click any line to open it; every PO can still be viewed. A quick find or status filter opens all groups.
+- **PO Search tab.** Filter by product, store, requester, status, PO #, receiving (variance / complete / not received), date range and keyword. Tiles show PO count, units, value and rows. Results are listed one row per product line, with received quantities in red where they differ. **Export Excel** produces an .xlsx file (or a CSV if the Excel library can't load). **Export PDF** produces a landscape report with the filters used and totals.
+
+**Test after publishing:** create a PO, use Save & create PDF, mark it Sent, confirm View no longer allows edits, log receiving with one short line, then find it in PO Search with Receiving = Variance logged.

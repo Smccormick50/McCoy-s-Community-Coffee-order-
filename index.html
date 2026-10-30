@@ -1,44 +1,592 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#00543b"><title>McCoy's | Community Coffee Orders</title><link rel="manifest" href="manifest.json"><link rel="icon" href="coffee-orders.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="coffee-icon-32.png"><link rel="apple-touch-icon" sizes="180x180" href="coffee-icon-180.png"><style>
-:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#19352d;background:#f4f7f5}*{box-sizing:border-box}body{margin:0}header{background:#00543b;color:white;padding:16px max(16px,env(safe-area-inset-left));}header .logos{display:flex;gap:18px;align-items:center;justify-content:space-between}header img{width:45%;height:76px;object-fit:contain;background:white;border-radius:10px;padding:7px}.wrap{max-width:850px;margin:auto;padding:16px}.panel{background:white;border:1px solid #dbe5df;border-radius:15px;padding:18px;margin-bottom:16px;box-shadow:0 2px 7px #163c2410}h1{font-size:1.4rem;margin:12px 0 0}h2{font-size:1.15rem;margin:0 0 14px}label{font-size:.86rem;font-weight:650;display:block;margin:10px 0 5px}input,textarea,select{width:100%;padding:12px;border:1px solid #b9cfc4;border-radius:9px;font:inherit;background:#fff;min-width:0}button{border:0;border-radius:9px;background:#006747;color:#fff;font:inherit;font-weight:650;padding:12px 15px;cursor:pointer}button.secondary{background:#e4efe9;color:#00543b}button.warn{background:#8a322d}button:disabled{opacity:.5;cursor:not-allowed}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.item{display:grid;grid-template-columns:1fr 94px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #e4ebe7}.item small{color:#64766c;display:block;margin-top:3px}.item input{text-align:center;font-size:1.1rem;font-weight:700}.muted{color:#64766c;font-size:.9rem}.actions{display:flex;gap:8px;flex-wrap:wrap}.total{display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;font-weight:800;padding:15px;background:#f1f8f3;border-radius:10px;margin:14px 0}.hidden{display:none!important}.pill{display:inline-block;background:#e4efe9;color:#00543b;padding:4px 8px;border-radius:8px;font-size:.75rem}.order{border-bottom:1px solid #e4ebe7;padding:12px 0}.order:last-child{border:0}.order button{margin:5px 5px 0 0;padding:8px 10px;font-size:.84rem}.admin-row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e4ebe7}.admin-row small{display:block;color:#64766c}.admin-row input{text-align:right}.catalog-add{border:1px solid #c8dbcf;border-radius:12px;padding:14px;margin-top:20px;background:#f6faf7}.catalog-add .grid{margin-bottom:8px}.note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}.error{color:#a12525;white-space:pre-wrap}#message{padding:8px 0;font-size:.9rem}@media(max-width:520px){.grid{grid-template-columns:1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:1fr 80px}.admin-row{grid-template-columns:1fr 95px}}
-</style></head><body><header><div class="wrap" style="padding:0"><div class="logos"><img src="mccoys-logo.png" alt="McCoy's Building Supply"><img src="community-logo.png" alt="Community Coffee"></div><h1>Community Coffee Purchase Orders</h1></div></header><main class="wrap"><section id="setup" class="panel hidden"><h2>Firebase configuration needed</h2><p>Open <code>firebase-config.js</code> and paste your new Firebase web app configuration. Follow README.md to activate login and order history.</p></section><section id="auth" class="panel hidden"><h2>Team sign in</h2><form id="loginForm"><label>Email</label><input id="email" type="email" autocomplete="username" required><label>Password</label><input id="password" type="password" autocomplete="current-password" required><div class="actions" style="margin-top:14px"><button>Sign in</button><button type="button" class="secondary" id="resetPassword">Forgot password?</button></div><p id="resetStatus" role="status" class="muted"></p></form><p class="muted">An administrator must create each user in Firebase Authentication. Public account registration is disabled.</p></section><div id="app" class="hidden"><div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span id="who" class="muted"></span><button class="secondary" id="signout">Sign out</button></div><nav class="actions" style="margin-bottom:12px"><button id="newTab">New order</button><button class="secondary" id="historyTab">Order history</button><button class="secondary hidden" id="adminTab">Admin · Pricing</button></nav><section id="newOrder"><div class="panel"><h2>Order information</h2><div class="grid"><div><label>Purchase order number</label><input id="poNumber" placeholder="Assigned on first save (starting at 9001)" readonly><small class="muted">Automatically assigned when you save the order.</small></div><div><label>Order date (editable)</label><input id="orderDate" type="date" required></div><div><label>Requested by</label><input id="requester" placeholder="Automatically filled from login" readonly></div><div><label>Ship to / store</label><input id="shipTo" value="McCoy's Building Supply - 1350 N Interstate 35, San Marcos, TX 78666-7130"></div></div><label>Notes / delivery instructions</label><textarea id="notes" rows="2"></textarea></div><div class="panel"><h2>Products</h2><p class="muted">Enter quantities only for items you want. Prices are estimates based on the October 14, 2026 invoice; confirm current pricing with Community Coffee.</p><div id="items"></div><h2 style="margin-top:20px">Free merchandise</h2><p class="muted">No-charge items shown separately. Availability must be confirmed with Community Coffee.</p><div id="freeItems"></div><div class="total"><span id="units">0 units</span><span id="total">$0.00</span></div><div class="actions"><button id="saveOrder">Save order</button><button class="secondary" id="pdfOrder">Create PDF</button><button class="secondary" id="emailOrder">Email PDF</button><button class="secondary" id="clearOrder">Clear form</button></div><p id="message" role="status"></p><p class="note">Saving automatically clears the form, while PDF and Email PDF remain available for the just-saved order. Email PDF downloads a PDF and opens your email app with order details. Attach the downloaded PDF before sending. The app cannot automatically attach a file to an email draft.</p></div></section><section id="history" class="panel hidden"><h2>Order history</h2><div class="grid"><div><label>Search by PO / requester / store</label><input id="historySearch" placeholder="Search orders"></div><div><label>Status</label><select id="historyStatus"><option value="">All statuses</option><option>Draft</option><option>Sent</option><option>Received</option><option>Cancelled</option></select></div></div><div id="orders"></div></section><section id="admin" class="panel hidden"><h2>Admin · Product names and pricing</h2><p class="muted">Edit product descriptions and prices for new orders. Previously saved orders retain their original descriptions and unit prices.</p><p class="note">The free merchandise section is listed separately, and stays at $0.00. Free items must be confirmed with the vendor.</p><div id="adminProducts"></div><div class="catalog-add"><h2>Add new product</h2><p class="muted">New items will appear automatically for every employee in the correct order section.</p><form id="addProductForm"><div class="grid"><div><label for="newItemId">Community Coffee item number</label><input id="newItemId" required maxlength="64" placeholder="e.g. 12345" pattern="[A-Za-z0-9_-]+"></div><div><label for="newItemName">Product description</label><input id="newItemName" required maxlength="140" placeholder="e.g. Coffee cups 100CT"></div><div><label for="newItemCategory">Section</label><select id="newItemCategory"><option value="paid">Purchase items</option><option value="free">Free merchandise</option></select></div><div><label for="newItemPrice">Unit price ($)</label><input id="newItemPrice" type="number" required min="0" max="9999999" step="0.01" inputmode="decimal" value="0.00"></div></div><button type="submit" id="addProduct">Add product</button><p id="addProductMessage" role="status"></p></form></div><div class="actions" style="margin-top:14px"><button id="savePrices">Save product changes</button></div><p id="adminMessage" role="status"></p></section></div></main><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script><script type="module">
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#00543b">
+<title>McCoy's | Community Coffee Orders</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="coffee-orders.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="coffee-icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="coffee-icon-180.png">
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#19352d;background:#f4f7f5}
+*{box-sizing:border-box}body{margin:0}
+header{background:#00543b;color:white;padding:16px max(16px,env(safe-area-inset-left))}
+header .logos{display:flex;gap:18px;align-items:center;justify-content:space-between}
+header img{width:45%;height:76px;object-fit:contain;background:white;border-radius:10px;padding:7px}
+.wrap{max-width:1000px;margin:auto;padding:16px}
+.panel{background:white;border:1px solid #dbe5df;border-radius:15px;padding:18px;margin-bottom:16px;box-shadow:0 2px 7px #163c2410}
+h1{font-size:1.4rem;margin:12px 0 0}h2{font-size:1.15rem;margin:0 0 14px}
+label{font-size:.86rem;font-weight:650;display:block;margin:10px 0 5px}
+input,textarea,select{width:100%;padding:12px;border:1px solid #b9cfc4;border-radius:9px;font:inherit;background:#fff;min-width:0;color:inherit}
+input[readonly],input:disabled,textarea:disabled,select:disabled{background:#eef2ef;color:#5a6b62;border-color:#d6e0da}
+input[readonly]{cursor:default}input:disabled,textarea:disabled{cursor:not-allowed}
+small.muted{display:block;margin-top:4px;font-size:.78rem}
+button{border:0;border-radius:9px;background:#006747;color:#fff;font:inherit;font-weight:650;padding:12px 15px;cursor:pointer}
+button.secondary{background:#e4efe9;color:#00543b}button.warn{background:#8a322d}
+button.gold{background:#ffd200;color:#00382a}
+button:disabled{opacity:.5;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.item{display:grid;grid-template-columns:1fr 94px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #e4ebe7}
+.item small{color:#64766c;display:block;margin-top:3px}
+.item input{text-align:center;font-size:1.1rem;font-weight:700}
+.muted{color:#64766c;font-size:.9rem}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.total{display:flex;justify-content:space-between;align-items:center;font-size:1.2rem;font-weight:800;padding:15px;background:#f1f8f3;border-radius:10px;margin:14px 0}
+.hidden{display:none!important}
+.pill{display:inline-block;background:#e4efe9;color:#00543b;padding:3px 8px;border-radius:8px;font-size:.75rem;font-weight:700;margin-left:6px;vertical-align:middle}
+.pill.Sent{background:#e3eefc;color:#1d4f91}.pill.Received{background:#e2f4e8;color:#17663a}.pill.Cancelled{background:#eee;color:#666}
+.pill.var{background:#fde8e6;color:#8a322d}
+.order{border-bottom:1px solid #e4ebe7;padding:12px 0}.order:last-child{border:0}
+.order button{margin:6px 6px 0 0;padding:8px 10px;font-size:.84rem}
+.order select{display:inline-block;width:auto;margin:6px 0 0;padding:7px 9px;font-size:.84rem}
+.month-head{display:flex;justify-content:space-between;gap:10px;font-weight:800;color:#00543b;margin:6px 0 2px;padding-bottom:6px;border-bottom:2px solid #00543b}
+details.group{border:1px solid #dbe5df;border-radius:10px;margin:10px 0;background:#fbfdfc}
+details.group>summary{cursor:pointer;padding:12px 14px;font-weight:700;display:flex;justify-content:space-between;gap:10px;list-style:none;flex-wrap:wrap}
+details.group>summary::-webkit-details-marker{display:none}
+details.group>summary span:first-child::before{content:'\25B8';display:inline-block;margin-right:8px;transition:transform .15s}
+details.group[open]>summary span:first-child::before{transform:rotate(90deg)}
+details.group>.inner{padding:0 14px 6px}
+details.year{background:#f1f8f3;border-color:#c8dbcf}
+details.year>.inner details.group{background:#fff}
+.admin-row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e4ebe7}
+.admin-row small{display:block;color:#64766c}.admin-row input{text-align:right}
+.catalog-add{border:1px solid #c8dbcf;border-radius:12px;padding:14px;margin-top:20px;background:#f6faf7}
+.catalog-add .grid{margin-bottom:8px}
+.note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}
+.lock-banner{background:#fff1e0;border-left:4px solid #c77700;padding:11px 12px;border-radius:6px;margin-bottom:14px;font-size:.9rem;font-weight:600}
+.error{color:#a12525;white-space:pre-wrap}
+#message,#historyMessage{padding:8px 0;font-size:.9rem}
+.recv-row{display:grid;grid-template-columns:1fr 110px;gap:8px 12px;align-items:end;padding:12px 8px;border-bottom:1px solid #e4ebe7;border-radius:8px}
+.recv-row small{display:block;color:#64766c;margin-top:3px}
+.recv-row label{margin:0 0 4px}
+.recv-row input[type=number]{text-align:center;font-weight:700;font-size:1.05rem}
+.recv-row .recv-note{grid-column:1/-1;padding:9px;font-size:.88rem}
+.recv-row.variance{background:#fff5f4}
+.recv-summary{padding:12px;border-radius:10px;margin:14px 0;font-weight:700;background:#e2f4e8;color:#17663a}
+.recv-summary.bad{background:#fde8e6;color:#8a322d}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+.tile{border:1px solid #dbe5df;border-radius:10px;padding:10px 12px;background:#f8faf9}
+.tile span{font-size:.68rem;letter-spacing:.06em;color:#64766c;text-transform:uppercase}
+.tile b{display:block;font-size:1.15rem;margin-top:2px}
+.table-wrap{overflow-x:auto;border-radius:8px;-webkit-overflow-scrolling:touch}
+table.results{width:100%;border-collapse:collapse;font-size:.84rem;min-width:900px}
+table.results th{background:#00543b;color:#ffd200;text-align:left;padding:10px 8px;white-space:nowrap}
+table.results td{padding:8px;border-bottom:1px solid #e4ebe7;vertical-align:top}
+table.results .num{text-align:right;white-space:nowrap}
+table.results td.bad{color:#a12525;font-weight:800}
+table.results td:nth-child(4){min-width:180px}table.results td.store{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.results button{padding:6px 9px;font-size:.8rem}
+table.results tfoot td{font-weight:800;background:#f1f8f3}
+@media(max-width:620px){.grid,.grid3{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:1fr 80px}.admin-row{grid-template-columns:1fr 95px}.recv-row{grid-template-columns:1fr 90px}}
+</style>
+</head>
+<body>
+<header><div class="wrap" style="padding:0"><div class="logos"><img src="mccoys-logo.png" alt="McCoy's Building Supply"><img src="community-logo.png" alt="Community Coffee"></div><h1>Community Coffee Purchase Orders</h1></div></header>
+<main class="wrap">
+<section id="setup" class="panel hidden"><h2>Firebase configuration needed</h2><p>Open <code>firebase-config.js</code> and paste your new Firebase web app configuration. Follow README.md to activate login and order history.</p></section>
+
+<section id="auth" class="panel hidden"><h2>Team sign in</h2>
+<form id="loginForm"><label>Email</label><input id="email" type="email" autocomplete="username" required><label>Password</label><input id="password" type="password" autocomplete="current-password" required>
+<div class="actions" style="margin-top:14px"><button>Sign in</button><button type="button" class="secondary" id="resetPassword">Forgot password?</button></div><p id="resetStatus" role="status" class="muted"></p></form>
+<p class="muted">An administrator must create each user in Firebase Authentication. Public account registration is disabled.</p></section>
+
+<div id="app" class="hidden">
+<div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px"><span id="who" class="muted"></span><button class="secondary" id="signout">Sign out</button></div>
+<nav class="actions" style="margin-bottom:12px"><button id="newTab">New order</button><button class="secondary" id="historyTab">Order history</button><button class="secondary" id="searchTab">PO Search</button><button class="secondary hidden" id="adminTab">Admin · Pricing</button></nav>
+
+<!-- NEW / VIEW ORDER -->
+<section id="newOrder">
+<div class="panel">
+<div id="lockBanner" class="lock-banner hidden"></div>
+<h2>Order information</h2>
+<div class="grid">
+<div><label for="poNumber">Purchase order number</label><input id="poNumber" placeholder="Assigned on first save (starting at 9001)" readonly><small class="muted">Assigned automatically when the order is saved.</small></div>
+<div><label for="orderDate">Order date (editable)</label><input id="orderDate" type="date" required></div>
+<div><label for="requester">Requested by</label><input id="requester" placeholder="Filled from your login" readonly><small class="muted">Filled automatically from your login.</small></div>
+<div><label for="shipTo">Ship to / store</label><input id="shipTo"></div>
+</div>
+<label for="notes">Notes / delivery instructions</label><textarea id="notes" rows="2"></textarea>
+</div>
+<div class="panel">
+<h2>Products</h2><p class="muted" id="productsHint">Enter quantities only for items you want. Prices are estimates based on the October 14, 2026 invoice; confirm current pricing with Community Coffee.</p>
+<div id="items"></div>
+<h2 style="margin-top:20px">Free merchandise</h2><p class="muted">No-charge items shown separately. Availability must be confirmed with Community Coffee.</p>
+<div id="freeItems"></div>
+<div class="total"><span id="units">0 units</span><span id="total">$0.00</span></div>
+<div class="actions"><button id="saveOrder">Save order</button><button class="secondary" id="pdfOrder">Save &amp; create PDF</button><button class="secondary" id="emailOrder">Save &amp; email PDF</button><button class="gold hidden" id="receiveFromForm">Log receiving</button><button class="secondary" id="clearOrder">Clear form</button></div>
+<p id="message" role="status"></p>
+<div class="actions"><button class="gold hidden" id="markSent"></button></div>
+<p class="note" id="formNote">Create PDF and Email PDF save the order automatically first, then the form clears for the next order. Email PDF downloads the PDF and opens your email app addressed to Community Coffee. Attach the downloaded PDF before sending, then mark the PO as <b>Sent</b> to lock it.</p>
+</div>
+</section>
+
+<!-- HISTORY -->
+<section id="history" class="panel hidden">
+<h2>Order history</h2>
+<div class="grid"><div><label for="historySearch">Quick find (PO / requester / store)</label><input id="historySearch" placeholder="Search orders"></div>
+<div><label for="historyStatus">Status</label><select id="historyStatus"><option value="">All statuses</option><option>Draft</option><option>Sent</option><option>Received</option><option>Cancelled</option></select></div></div>
+<p id="historyMessage" role="status"></p>
+<div id="orders"></div>
+</section>
+
+<!-- PO SEARCH -->
+<section id="search" class="panel hidden">
+<h2>PO Search &amp; Reporting</h2>
+<p class="muted">Filter purchase order history by product, store, requester, status, PO, receiving variance, or date range. Export the filtered results.</p>
+<div class="grid3">
+<div><label for="sProduct">Product</label><select id="sProduct"><option value="">All products</option></select></div>
+<div><label for="sStore">Store / ship to</label><select id="sStore"><option value="">All stores</option></select></div>
+<div><label for="sRequester">Requested by</label><select id="sRequester"><option value="">All requesters</option></select></div>
+<div><label for="sStatus">Status</label><select id="sStatus"><option value="">All statuses</option><option>Draft</option><option>Sent</option><option>Received</option><option>Cancelled</option></select></div>
+<div><label for="sPo">PO #</label><input id="sPo" inputmode="numeric" placeholder="PO #"></div>
+<div><label for="sVariance">Receiving</label><select id="sVariance"><option value="">Any</option><option value="yes">Variance logged</option><option value="no">Received complete</option><option value="pending">Not yet received</option></select></div>
+<div><label for="sFrom">From date</label><input id="sFrom" type="date"></div>
+<div><label for="sTo">To date</label><input id="sTo" type="date"></div>
+<div><label for="sKeyword">Keyword</label><input id="sKeyword" placeholder="Description, notes…"></div>
+</div>
+<div class="actions" style="margin-top:14px"><button id="sRun">Search</button><button class="gold" id="sClear">Clear</button><button class="gold" id="sExcel">Export Excel</button><button class="gold" id="sPdf">Export PDF</button></div>
+<p id="searchMessage" role="status" class="muted"></p>
+<div class="tiles"><div class="tile"><span>POs</span><b id="tPos">0</b></div><div class="tile"><span>Units</span><b id="tUnits">0</b></div><div class="tile"><span>Value</span><b id="tValue">$0.00</b></div><div class="tile"><span>Rows</span><b id="tRows">0</b></div></div>
+<div class="table-wrap"><table class="results"><thead><tr><th>Date</th><th>PO</th><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Rcvd</th><th class="num">Unit</th><th class="num">Extended</th><th>Store</th><th>Requested by</th><th>Status</th><th>Action</th></tr></thead><tbody id="sBody"></tbody><tfoot id="sFoot"></tfoot></table></div>
+</section>
+
+<!-- RECEIVING -->
+<section id="receive" class="panel hidden">
+<h2 id="recvTitle">Receive PO</h2>
+<p class="muted" id="recvInfo"></p>
+<div class="grid"><div><label for="recvDate">Date received</label><input id="recvDate" type="date"></div><div><label for="recvBy">Received by</label><input id="recvBy" readonly></div></div>
+<p class="muted" style="margin-top:14px">Enter the quantity that actually arrived for each line. Anything different from what was ordered is logged as a variance. Ordered quantities cannot be changed.</p>
+<div id="recvLines"></div>
+<div id="recvSummary" class="recv-summary"></div>
+<label for="recvNotes">Receiving notes (substitutions, damage, extra items, back-orders)</label><textarea id="recvNotes" rows="3" maxlength="1000"></textarea>
+<div class="actions" style="margin-top:14px"><button id="recvSave">Save receiving</button><button class="secondary" id="recvCancel">Cancel</button></div>
+<p id="recvMessage" role="status"></p>
+</section>
+
+<!-- ADMIN -->
+<section id="admin" class="panel hidden">
+<h2>Admin · Product names and pricing</h2>
+<p class="muted">Edit product descriptions and prices for new orders. Previously saved orders keep their original descriptions and unit prices.</p>
+<p class="note">The free merchandise section is listed separately, and stays at $0.00. Free items must be confirmed with the vendor.</p>
+<div id="adminProducts"></div>
+<div class="actions" style="margin-top:14px"><button id="savePrices">Save product changes</button></div>
+<p id="adminMessage" role="status"></p>
+<div class="catalog-add"><h2>Add new product</h2><p class="muted">New items will appear automatically for every employee in the correct order section.</p>
+<form id="addProductForm"><div class="grid">
+<div><label for="newItemId">Community Coffee item number</label><input id="newItemId" required maxlength="64" placeholder="e.g. 12345" pattern="[A-Za-z0-9_-]+"></div>
+<div><label for="newItemName">Product description</label><input id="newItemName" required maxlength="140" placeholder="e.g. Coffee cups 100CT"></div>
+<div><label for="newItemCategory">Section</label><select id="newItemCategory"><option value="paid">Purchase items</option><option value="free">Free merchandise</option></select></div>
+<div><label for="newItemPrice">Unit price ($)</label><input id="newItemPrice" type="number" required min="0" max="9999999" step="0.01" inputmode="decimal" value="0.00"></div>
+</div><button type="submit" id="addProduct">Add product</button><p id="addProductMessage" role="status"></p></form></div>
+<div class="catalog-add"><h2>Vendor email</h2><p class="muted">Email PDF opens a draft addressed here. Separate multiple addresses with commas.</p>
+<label for="vendorEmail">Community Coffee order email</label><input id="vendorEmail" type="text" inputmode="email" maxlength="300" placeholder="orders@example.com">
+<div class="actions" style="margin-top:10px"><button type="button" id="saveVendor">Save vendor email</button></div><p id="vendorMessage" role="status"></p></div>
+</section>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth,onAuthStateChanged,signInWithEmailAndPassword,sendPasswordResetEmail,signOut } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import {getFirestore,collection,addDoc,updateDoc,doc,query,orderBy,onSnapshot,serverTimestamp,getDoc,writeBatch,runTransaction} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { getFirestore,collection,updateDoc,doc,query,orderBy,onSnapshot,serverTimestamp,getDoc,setDoc,writeBatch,runTransaction } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import config from './firebase-config.js';
+
+/* ---------- catalog & state ---------- */
 const defaults=[['10104','CF FRAC CAFE 3.00OZ 36CT',73.54,'paid'],['10305','CF FRAC SIG BLND 3.00OZ 36CT',73.54,'paid'],['15404','CF FRAC CAFE DCF 2.50OZ 20CT',39.67,'paid'],['26790','TEA HOT CCC SS 100CT',7,'paid'],['26829','TEA BAG CCC GRN 48CT',11.70,'paid'],['90162','SWTNR CCC YELLOW SS 400CT',8,'paid'],['90172','CRMR INTL FR VAN 192CT',22.55,'paid'],['94000','CARN SS 50CT',17.65,'paid'],['95502','CRMR INTL DEL HALF & HALF 180C',19.40,'paid'],['90238','FLT BUNN 12CP 200CT',0,'free']];
-let products=defaults.map(([id,name,price,category])=>({id,name,price,category})).sort((a,b)=>Number(a.id)-Number(b.id));let isAdmin=false,catalogLoaded=false,unsubCatalog=null,loadedPriceMap=null;let priceDrafts={},nameDrafts={};
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const $=id=>document.getElementById(id),money=n=>'$'+Number(n).toFixed(2);let auth,db,currentUser,history=[],activeId=null,lastSavedOrder=null,unsubscribe=null;const employeeNames={"carlos.garcia":"Carlos Garcia","steven.mccormick":"Steven McCormick","greg.wallace":"Greg Wallace","aron.mireles":"Aron Mireles"};function todayLocal(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}function employeeName(user){const prefix=(user?.email||"").split("@")[0].toLowerCase();return user?.displayName||employeeNames[prefix]||prefix.split(/[._-]/).filter(Boolean).map(v=>v[0].toUpperCase()+v.slice(1)).join(" ")||"Employee"}
-function msg(t,bad=false){$('message').textContent=t;$('message').className=bad?'error':''}function renderProducts(){for(const cat of ['paid','free']){const target=$(cat==='paid'?'items':'freeItems');const quantities=Object.fromEntries([...document.querySelectorAll('[data-id]')].map(e=>[e.dataset.id,e.value]));target.innerHTML=products.filter(x=>x.category===cat).map(x=>`<div class="item"><div><b>${esc(x.name)}</b><small>Item ${esc(x.id)} · ${cat==='free'?'FREE':money(x.price)+' / unit'}</small></div><input type="number" inputmode="numeric" min="0" step="1" value="${esc(quantities[x.id]??'0')}" data-id="${esc(x.id)}" aria-label="Quantity for ${esc(x.name)}"></div>`).join('')}document.querySelectorAll('[data-id]').forEach(e=>e.addEventListener('input',updateTotals));updateTotals()}
-function lines(){return products.map(x=>{const input=document.querySelector(`[data-id="${x.id}"]`);return {id:x.id,description:x.name,category:x.category,unitPrice:loadedPriceMap?.[x.id]??x.price,qty:Number(input?.value)||0}}).filter(x=>x.qty>0)}
-function updateTotals(){let l=lines();$('units').textContent=l.reduce((s,x)=>s+x.qty,0)+' units';$('total').textContent=money(l.reduce((s,x)=>s+x.qty*x.unitPrice,0))}function getOrder(){const l=lines();if(!currentUser)throw Error('Sign in to create an order.');if(!$('orderDate').value)throw Error('Select an order date.');if(!l.length)throw Error('Enter at least one product quantity.');if(l.some(x=>!Number.isSafeInteger(x.qty)||x.qty<1))throw Error('Quantities must be whole positive numbers.');return {poNumber:$('poNumber').value.trim(),requester:activeId?$('requester').value:employeeName(currentUser),orderDate:$('orderDate').value,shipTo:$('shipTo').value.trim(),notes:$('notes').value.trim(),lines:l,units:l.reduce((s,x)=>s+x.qty,0),total:Math.round(l.reduce((s,x)=>s+x.qty*x.unitPrice,0)*100)/100,updatedBy:currentUser.email}}
-async function save(){
- const o=getOrder();
- if(activeId){const previous=history.find(h=>h.id===activeId);if(!previous)throw Error('This order is not yet available in history.');await updateDoc(doc(db,'orders',activeId),{...o,poNumber:previous.poNumber,createdBy:previous.createdBy,createdAt:previous.createdAt,updatedAt:serverTimestamp()});$('poNumber').value=String(previous.poNumber);lastSavedOrder={...o,poNumber:String(previous.poNumber)};clear();msg('PO '+previous.poNumber+' updated and form cleared. Create PDF or Email PDF for this saved order, or open Order history.');return lastSavedOrder;}
- const counter=doc(db,'settings','poCounter'),orderRef=doc(collection(db,'orders'));let assigned;
- await runTransaction(db,async tx=>{const snap=await tx.get(counter);assigned=snap.exists()?snap.data().lastNumber+1:9001;if(!Number.isSafeInteger(assigned)||assigned<9001)throw Error('Invalid PO counter.');tx.set(counter,{lastNumber:assigned});tx.set(orderRef,{...o,poNumber:assigned,status:'Draft',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdBy:currentUser.uid});});
- lastSavedOrder={...o,poNumber:String(assigned)};clear();msg('PO '+assigned+' saved. Form cleared for the next order. Create PDF or Email PDF to use this saved order.');return lastSavedOrder;
-}
+const byItem=(a,b)=>{const an=Number(a.id),bn=Number(b.id);return Number.isFinite(an)&&Number.isFinite(bn)?an-bn:String(a.id).localeCompare(String(b.id),undefined,{numeric:true})};
+let products=defaults.map(([id,name,price,category])=>({id,name,price,category})).sort(byItem);
+let isAdmin=false,catalogLoaded=false,unsubCatalog=null,priceDrafts={},nameDrafts={};
+let auth,db,currentUser,history=[],unsubscribe=null,vendorEmail='';
+let activeId=null,loadedLines=null,lockedOrder=null,lastSavedOrder=null,receivingOrder=null,lastSearch=[];
+const openGroups=new Set();
+const DEFAULT_SHIP="McCoy's Building Supply - 1350 N Interstate 35, San Marcos, TX 78666-7130";
+const employeeNames={"carlos.garcia":"Carlos Garcia","steven.mccormick":"Steven McCormick","greg.wallace":"Greg Wallace","aron.mireles":"Aron Mireles"};
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>'$'+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const round2=n=>Math.round(n*100)/100;
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const todayLocal=()=>ymd(new Date());
+const fmtDate=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?`${m[2]}/${m[3]}/${m[1]}`:(s||'')};
+const orderDateStr=o=>/^\d{4}-\d{2}-\d{2}$/.test(o.orderDate||'')?o.orderDate:(o.createdAt?.toDate?ymd(o.createdAt.toDate()):todayLocal());
+const statusOf=o=>o.status||'Draft';
+const monthLabel=ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+const byData=(attr,id)=>[...document.querySelectorAll(`[${attr}]`)].find(e=>e.getAttribute(attr)===String(id));
+const canEdit=o=>statusOf(o)==='Draft'&&(isAdmin||o.createdBy===currentUser?.uid);
+const shortStore=s=>String(s||'').replace(/^McCoy'?s Building Supply\s*-\s*/i,'');
+function employeeName(user){const prefix=(user?.email||'').split('@')[0].toLowerCase();return user?.displayName||employeeNames[prefix]||prefix.split(/[._-]/).filter(Boolean).map(v=>v[0].toUpperCase()+v.slice(1)).join(' ')||'Employee'}
+function msg(t,bad=false){$('message').textContent=t;$('message').className=bad?'error':''}
+function loadScript(src,ready){if(ready())return Promise.resolve();return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=()=>ready()?resolve():reject(Error('Library failed to initialize: '+src));s.onerror=()=>reject(Error('Could not load '+src+'. Check your internet connection.'));document.head.append(s)})}
 let pdfLoading;
-async function ensurePdf(){if(window.jspdf?.jsPDF)return;pdfLoading??=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js';script.onload=()=>window.jspdf?.jsPDF?resolve():reject(Error('PDF library failed to initialize'));script.onerror=()=>reject(Error('PDF generator could not load. Check internet access or try another browser.'));document.head.append(script)});await pdfLoading;}
-async function logoData(filename){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);resolve({data:canvas.toDataURL('image/png'),ratio:img.naturalWidth/img.naturalHeight})}catch(e){reject(e)}};img.onerror=()=>reject(Error('Could not load logo: '+filename));img.src=filename})}
-async function pdf(o){if(!window.jspdf)throw Error('PDF library is unavailable. Check your internet connection.');const d=new window.jspdf.jsPDF({unit:'pt',format:'letter'});let y=42;try{const [mc,cc]=await Promise.all([logoData('mccoys-logo.png'),logoData('community-logo.png')]);const w1=190,w2=151;d.addImage(mc.data,'PNG',42,31,w1,w1/mc.ratio);d.addImage(cc.data,'PNG',570-w2,31,w2,w2/cc.ratio);y=Math.max(31+w1/mc.ratio,31+w2/cc.ratio)+30}catch(e){console.warn('Logos unavailable; creating PDF without logos',e)}const row=(a,b)=>{d.text(a,42,y);if(b)d.text(b,570,y,{align:'right'});y+=18};const page=()=>{if(y>693){d.addPage();y=48}};d.setFont('helvetica','bold');d.setFontSize(14);row('COMMUNITY COFFEE - PURCHASE ORDER');d.setFont('helvetica','normal');d.setFontSize(10);y+=8;row('PO: '+o.poNumber,'Order date: '+(o.orderDate||o.createdAt?.toDate?.().toLocaleDateString()||new Date().toLocaleDateString()));row('Requested by: '+o.requester);d.text('Ship to: '+o.shipTo,42,y,{maxWidth:525});y+=Math.max(18,d.splitTextToSize('Ship to: '+o.shipTo,525).length*13);row('Vendor: Community Coffee Company, LLC');y+=10;const drawSection=(heading,items)=>{page();d.setFont('helvetica','bold');row(heading);d.setFontSize(9);row('ITEM / DESCRIPTION','QTY       UNIT        EXTENDED');d.line(42,y-12,570,y-12);d.setFont('helvetica','normal');for(const x of items){page();const desc=`${x.id}  ${x.description}`;d.text(desc.length>47?desc.slice(0,44)+'...':desc,42,y);d.text(String(x.qty),414,y,{align:'right'});d.text(money(x.unitPrice),486,y,{align:'right'});d.text(money(x.qty*x.unitPrice),570,y,{align:'right'});y+=20}y+=9};const paid=o.lines.filter(x=>x.category!=='free'),free=o.lines.filter(x=>x.category==='free');if(paid.length)drawSection('PURCHASE ITEMS',paid);if(free.length)drawSection('FREE MERCHANDISE - NO CHARGE',free);page();d.line(42,y-8,570,y-8);d.setFont('helvetica','bold');row('TOTAL UNITS: '+o.units,'ESTIMATED TOTAL: '+money(o.total));d.setFont('helvetica','normal');if(o.notes){page();y+=8;const n=d.splitTextToSize('Notes: '+o.notes,525);d.text(n,42,y);y+=n.length*12}d.setFontSize(8);const num=d.internal.getNumberOfPages();for(let i=1;i<=num;i++){d.setPage(i);d.text('Catalog prices are estimates. Confirm free goods and pricing with Community Coffee.',42,755);d.text('Purchase order only - not a vendor invoice.',42,769)}const filename='Community-Coffee-PO-'+String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')+'.pdf';d.save(filename);return filename}
-function email(o){const subject='McCoy\'s Community Coffee PO '+o.poNumber;const body=`Community Coffee,\n\nPlease process the attached purchase order.\n\nPO: ${o.poNumber}\nRequested by: ${o.requester}\nTotal units: ${o.units}\nEstimated total: ${money(o.total)}\n\nThank you.`;window.location.href='mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body)}
-function load(o,id){lastSavedOrder=null;activeId=id;loadedPriceMap=Object.fromEntries((o.lines||[]).map(x=>[x.id,x.unitPrice]));$('poNumber').value=o.poNumber||'';$('requester').value=o.requester||'';$('shipTo').value=o.shipTo||'';$('orderDate').value=o.orderDate||o.createdAt?.toDate?.().toLocaleDateString('en-CA')||todayLocal();$('notes').value=o.notes||'';document.querySelectorAll('[data-id]').forEach(e=>e.value=(o.lines||[]).find(x=>x.id===e.dataset.id)?.qty||0);updateTotals();tab('new');msg('Loaded PO '+o.poNumber)}function clear(){activeId=null;loadedPriceMap=null;['poNumber','notes'].forEach(id=>$(id).value='');$('requester').value=employeeName(currentUser);$('orderDate').value=todayLocal();$('shipTo').value="McCoy's Building Supply - 1350 N Interstate 35, San Marcos, TX 78666-7130";document.querySelectorAll('[data-id]').forEach(e=>e.value=0);updateTotals();msg('')}
-function tab(t){if(t==='admin'&&!isAdmin)return;for(const n of ['new','history','admin'])$(n==='new'?'newOrder':n).classList.toggle('hidden',t!==n);for(const n of ['new','history','admin'])$(n+'Tab').classList.toggle('secondary',t!==n)}
+async function ensurePdf(){if(window.jspdf?.jsPDF)return;pdfLoading??=loadScript('https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF).catch(e=>{pdfLoading=null;throw Error('PDF generator could not load. Check internet access or try another browser.')});await pdfLoading}
+
+/* ---------- order form ---------- */
+// Products shown on the form. When an existing order is open, its saved descriptions/prices win (fix #3).
+function displayProducts(){
+ const list=products.map(p=>{const l=loadedLines?.[p.id];return l?{...p,name:l.description,price:l.unitPrice,category:l.category||p.category}:p});
+ if(loadedLines)for(const l of Object.values(loadedLines))if(!list.some(p=>p.id===l.id))list.push({id:l.id,name:l.description,price:l.unitPrice,category:l.category||'paid'});
+ return list.sort(byItem);
+}
+function renderProducts(qtyOverride){
+ const quantities=qtyOverride??Object.fromEntries([...document.querySelectorAll('[data-id]')].map(e=>[e.dataset.id,e.value]));
+ const locked=!!lockedOrder,list=displayProducts();
+ for(const cat of ['paid','free']){
+  const rows=list.filter(x=>x.category===cat).map(x=>{const q=quantities[x.id]??'0';return `<div class="item${locked&&!(Number(q)>0)?' hidden':''}"><div><b>${esc(x.name)}</b><small>Item ${esc(x.id)} · ${cat==='free'?'FREE':money(x.price)+' / unit'}</small></div><input type="number" inputmode="numeric" min="0" step="1" value="${esc(q)}" data-id="${esc(x.id)}" aria-label="Quantity for ${esc(x.name)}"${locked?' disabled':''}></div>`});
+  const anyShown=list.some(x=>x.category===cat&&(!locked||Number(quantities[x.id])>0));
+  $(cat==='paid'?'items':'freeItems').innerHTML=rows.join('')+(locked&&!anyShown?'<p class="muted">None on this order.</p>':'');
+ }
+ document.querySelectorAll('[data-id]').forEach(e=>e.addEventListener('input',updateTotals));
+ updateTotals();
+}
+function lines(){return displayProducts().map(x=>({id:x.id,description:x.name,category:x.category,unitPrice:x.price,qty:Number(byData('data-id',x.id)?.value)||0})).filter(x=>x.qty>0)}
+function updateTotals(){const l=lines();const u=l.reduce((s,x)=>s+x.qty,0);$('units').textContent=u+(u===1?' unit':' units');$('total').textContent=money(l.reduce((s,x)=>s+x.qty*x.unitPrice,0))}
+function getOrder(){
+ const l=lines();
+ if(!currentUser)throw Error('Sign in to create an order.');
+ if(!$('orderDate').value)throw Error('Select an order date.');
+ if(!l.length)throw Error('Enter at least one product quantity.');
+ if(l.some(x=>!Number.isSafeInteger(x.qty)||x.qty<1))throw Error('Quantities must be whole positive numbers.');
+ return {requester:activeId?$('requester').value:employeeName(currentUser),orderDate:$('orderDate').value,shipTo:$('shipTo').value.trim(),notes:$('notes').value.trim(),lines:l,units:l.reduce((s,x)=>s+x.qty,0),total:round2(l.reduce((s,x)=>s+x.qty*x.unitPrice,0)),updatedBy:currentUser.email};
+}
+async function save(){
+ if(lockedOrder)throw Error('This PO is locked and cannot be changed.');
+ const o=getOrder();
+ if(activeId){
+  const previous=history.find(h=>h.id===activeId);
+  if(!previous)throw Error('This order is not yet available in history.');
+  if(statusOf(previous)!=='Draft')throw Error('PO '+previous.poNumber+' was marked '+statusOf(previous)+' and is now locked.');
+  await updateDoc(doc(db,'orders',activeId),{...o,updatedAt:serverTimestamp()});
+  const saved={...previous,...o,id:activeId};
+  lastSavedOrder=saved;clear();updateMarkSent();
+  msg('PO '+saved.poNumber+' updated. Form cleared for the next order.');
+  return saved;
+ }
+ // New PO: the order document ID is the PO number, and the rules only allow the counter to move when that order is created (fix #4: no skipped numbers).
+ const counter=doc(db,'settings','poCounter');let assigned;
+ await runTransaction(db,async tx=>{
+  const snap=await tx.get(counter);
+  assigned=snap.exists()?Number(snap.data().lastNumber)+1:9001;
+  if(!Number.isSafeInteger(assigned)||assigned<9001)throw Error('Invalid PO counter.');
+  const orderRef=doc(db,'orders',String(assigned));
+  if((await tx.get(orderRef)).exists())throw Error('PO '+assigned+' already exists. Ask an administrator to check settings/poCounter.');
+  tx.set(counter,{lastNumber:assigned});
+  tx.set(orderRef,{...o,poNumber:assigned,status:'Draft',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),createdBy:currentUser.uid});
+ });
+ const saved={...o,id:String(assigned),poNumber:assigned,status:'Draft',createdBy:currentUser.uid};
+ lastSavedOrder=saved;clear();updateMarkSent();
+ msg('PO '+assigned+' saved. Form cleared for the next order.');
+ return saved;
+}
+function setLocked(on,reason=''){
+ for(const id of ['orderDate','shipTo','notes'])$(id).disabled=on;
+ $('lockBanner').textContent=reason;$('lockBanner').classList.toggle('hidden',!on);
+ $('saveOrder').classList.toggle('hidden',on);
+ $('pdfOrder').textContent=on?'Create PDF':'Save & create PDF';
+ $('emailOrder').textContent=on?'Email PDF':'Save & email PDF';
+ $('clearOrder').textContent=on?'Start new order':'Clear form';
+ $('formNote').classList.toggle('hidden',on);$('productsHint').classList.toggle('hidden',on);
+ const canReceive=on&&lockedOrder&&['Sent','Received'].includes(statusOf(lockedOrder));
+ $('receiveFromForm').classList.toggle('hidden',!canReceive);
+ if(canReceive)$('receiveFromForm').textContent=lockedOrder.receiving?'Edit receiving':'Log receiving';
+}
+function load(o){
+ o=history.find(h=>h.id===o.id)||o;
+ lastSavedOrder=null;updateMarkSent();
+ activeId=o.id;loadedLines=Object.fromEntries((o.lines||[]).map(l=>[l.id,l]));
+ lockedOrder=canEdit(o)?null:o;
+ $('poNumber').value=o.poNumber??'';$('requester').value=o.requester||'';$('shipTo').value=o.shipTo||'';$('orderDate').value=orderDateStr(o);$('notes').value=o.notes||'';
+ renderProducts(Object.fromEntries((o.lines||[]).map(l=>[l.id,String(l.qty)])));
+ const st=statusOf(o);
+ let reason='';
+ if(lockedOrder&&st!=='Draft'){
+  reason=`PO ${o.poNumber} is ${st}${o.sentAt?.toDate?' (sent '+o.sentAt.toDate().toLocaleDateString()+')':''}. The quantities ordered are locked.`;
+  if(st==='Sent')reason+=' Use Log receiving when it arrives.';
+  if(st==='Received')reason+=o.hasVariance?' Receiving variances were logged.':' Received as ordered.';
+  if(isAdmin)reason+=' Admins can unlock it by setting the status back to Draft in Order history.';
+ }else if(lockedOrder)reason=`PO ${o.poNumber} was created by ${o.requester}. Only that person or an admin can edit it.`;
+ setLocked(!!lockedOrder,reason);
+ tab('new');msg(lockedOrder?'Viewing PO '+o.poNumber+'.':'Editing PO '+o.poNumber+'. Save to keep changes.');
+}
+function clear(){
+ activeId=null;loadedLines=null;lockedOrder=null;
+ $('poNumber').value='';$('notes').value='';$('requester').value=currentUser?employeeName(currentUser):'';$('orderDate').value=todayLocal();$('shipTo').value=DEFAULT_SHIP;
+ setLocked(false);renderProducts({});msg('');
+}
+// Create PDF / Email PDF save first (new request): returns the order to print.
+async function orderForOutput(){
+ if(lockedOrder)return {order:history.find(h=>h.id===lockedOrder.id)||lockedOrder,saved:false};
+ if(!activeId&&!lines().length&&lastSavedOrder)return {order:history.find(h=>h.id===lastSavedOrder.id)||lastSavedOrder,saved:false};
+ return {order:await save(),saved:true};
+}
+function updateMarkSent(){
+ const o=lastSavedOrder&&(history.find(h=>h.id===lastSavedOrder.id)||lastSavedOrder);
+ const show=!!o&&statusOf(o)==='Draft';
+ $('markSent').classList.toggle('hidden',!show);
+ if(show)$('markSent').textContent=`Mark PO ${o.poNumber} as Sent (locks it)`;
+}
+async function setStatus(o,status){
+ const data={status,updatedAt:serverTimestamp(),updatedBy:currentUser.email};
+ if(status==='Sent'){data.sentAt=serverTimestamp();data.sentBy=currentUser.email}
+ await updateDoc(doc(db,'orders',o.id),data);
+}
+
+/* ---------- PDF ---------- */
+async function logoData(filename){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);resolve({data:c.toDataURL('image/png'),ratio:img.naturalWidth/img.naturalHeight})}catch(e){reject(e)}};img.onerror=()=>reject(Error('Could not load logo: '+filename));img.src=filename})}
+const pdfSafe=s=>String(s??'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...');
+function footer(d,lineA){const n=d.internal.getNumberOfPages(),w=d.internal.pageSize.getWidth(),h=d.internal.pageSize.getHeight();d.setFont('helvetica','normal');d.setFontSize(8);d.setTextColor(90,107,98);for(let i=1;i<=n;i++){d.setPage(i);d.text(lineA,42,h-37);d.text('Purchase order only - not a vendor invoice.',42,h-23);d.text(`Page ${i} of ${n}`,w-42,h-23,{align:'right'})}}
+async function pdf(o){
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter'});const L=42,R=570,BOTTOM=712;let y=42;
+ const ink=()=>d.setTextColor(25,53,45),red=()=>d.setTextColor(161,37,37);
+ try{const [mc,cc]=await Promise.all([logoData('mccoys-logo.png'),logoData('community-logo.png')]);const w1=190,w2=151;d.addImage(mc.data,'PNG',L,31,w1,w1/mc.ratio);d.addImage(cc.data,'PNG',R-w2,31,w2,w2/cc.ratio);y=Math.max(31+w1/mc.ratio,31+w2/cc.ratio)+30}catch(e){console.warn('Logos unavailable; creating PDF without logos',e)}
+ ink();d.setFont('helvetica','bold');d.setFontSize(14);d.text('COMMUNITY COFFEE - PURCHASE ORDER',L,y);y+=24;
+ d.setFont('helvetica','normal');d.setFontSize(10);
+ const pair=(a,b)=>{d.text(pdfSafe(a),L,y);if(b)d.text(pdfSafe(b),R,y,{align:'right'});y+=16};
+ const st=statusOf(o);
+ pair('PO: '+o.poNumber,'Order date: '+fmtDate(orderDateStr(o)));
+ pair('Requested by: '+o.requester,st!=='Draft'?'Status: '+st:'');
+ const ship=d.splitTextToSize(pdfSafe('Ship to: '+(o.shipTo||'')),R-L);d.text(ship,L,y);y+=ship.length*13+3;
+ pair('Vendor: Community Coffee Company, LLC');y+=8;
+ const rec=o.receiving?Object.fromEntries((o.receiving.lines||[]).map(l=>[l.id,l])):null;
+ const C=rec?{desc:96,descW:215,qty:362,rcvd:412,unit:490,ext:R}:{desc:96,descW:265,qty:412,unit:490,ext:R};
+ const newPage=()=>{d.addPage();y=48;ink()};
+ const header=title=>{if(y+46>BOTTOM)newPage();d.setFont('helvetica','bold');d.setFontSize(10);d.text(title,L,y);y+=16;d.setFontSize(8.5);d.text('ITEM',L,y);d.text('DESCRIPTION',C.desc,y);d.text('QTY',C.qty,y,{align:'right'});if(rec)d.text('RCVD',C.rcvd,y,{align:'right'});d.text('UNIT',C.unit,y,{align:'right'});d.text('EXTENDED',C.ext,y,{align:'right'});y+=5;d.setLineWidth(.8);d.line(L,y,R,y);y+=13;d.setFont('helvetica','normal')};
+ const section=(title,items)=>{header(title);d.setFontSize(9.5);for(const x of items){const desc=d.splitTextToSize(pdfSafe(x.description),C.descW),idl=d.splitTextToSize(pdfSafe(x.id),C.desc-L-8);const h=Math.max(desc.length,idl.length)*11.5+6;if(y+h>BOTTOM){newPage();header(title+' (continued)');d.setFontSize(9.5)}d.text(idl,L,y);d.text(desc,C.desc,y);d.text(String(x.qty),C.qty,y,{align:'right'});if(rec&&rec[x.id]){if(rec[x.id].received!==x.qty){red();d.setFont('helvetica','bold')}d.text(String(rec[x.id].received),C.rcvd,y,{align:'right'});ink();d.setFont('helvetica','normal')}d.text(money(x.unitPrice),C.unit,y,{align:'right'});d.text(money(x.qty*x.unitPrice),C.ext,y,{align:'right'});y+=h}y+=6};
+ const paid=(o.lines||[]).filter(x=>x.category!=='free'),free=(o.lines||[]).filter(x=>x.category==='free');
+ if(paid.length)section('PURCHASE ITEMS',paid);
+ if(free.length)section('FREE MERCHANDISE - NO CHARGE',free);
+ if(y+50>BOTTOM)newPage();
+ d.line(L,y-6,R,y-6);y+=10;d.setFont('helvetica','bold');d.setFontSize(10);
+ pair('TOTAL UNITS ORDERED: '+o.units,'ESTIMATED TOTAL: '+money(o.total));
+ const para=(text,size=9.5,gap=4)=>{d.setFontSize(size);const t=d.splitTextToSize(pdfSafe(text),R-L);const h=t.length*12;if(y+h>BOTTOM)newPage();d.text(t,L,y);y+=h+gap};
+ if(rec){
+  const r=o.receiving,priceOf=id=>(o.lines||[]).find(x=>x.id===id)?.unitPrice||0;
+  pair('TOTAL UNITS RECEIVED: '+r.lines.reduce((s,l)=>s+l.received,0),'RECEIVED VALUE: '+money(r.lines.reduce((s,l)=>s+l.received*priceOf(l.id),0)));
+  y+=8;if(y+40>BOTTOM)newPage();d.setFont('helvetica','bold');d.setFontSize(10);d.text('RECEIVING',L,y);y+=15;d.setFont('helvetica','normal');
+  para(`Received ${fmtDate(r.date)} by ${r.by}.`);
+  const diffs=r.lines.filter(l=>l.received!==l.ordered);
+  if(!diffs.length){para('All items received as ordered.')}
+  for(const l of r.lines.filter(l=>l.received!==l.ordered||l.note)){const diff=l.received-l.ordered;const tag=diff<0?'SHORT '+(-diff):diff>0?'OVER '+diff:'OK';if(diff)red();para(`${l.id}  ${l.description}: ordered ${l.ordered}, received ${l.received} (${tag})${l.note?' - '+l.note:''}`);ink()}
+  if(r.notes)para('Receiving notes: '+r.notes);
+ }
+ d.setFont('helvetica','normal');
+ if(o.notes){y+=6;para('Order notes: '+o.notes)}
+ footer(d,'Catalog prices are estimates. Confirm free goods and pricing with Community Coffee.');
+ const filename='Community-Coffee-PO-'+String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')+(rec?'-received':'')+'.pdf';
+ d.save(filename);return filename;
+}
+function email(o){
+ const to=vendorEmail.split(',').map(s=>s.trim()).filter(Boolean).join(',');
+ const subject="McCoy's Community Coffee PO "+o.poNumber;
+ const items=(o.lines||[]).map(l=>`  ${l.qty} x ${l.id} ${l.description}`).join('\n');
+ const body=`Community Coffee,\n\nPlease process the attached purchase order.\n\nPO: ${o.poNumber}\nRequested by: ${o.requester}\nShip to: ${o.shipTo}\n\n${items}\n\nTotal units: ${o.units}\nEstimated total: ${money(o.total)}\n\nThank you.`;
+ window.location.href='mailto:'+to+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+
+/* ---------- tabs ---------- */
+const VIEWS={new:'newOrder',history:'history',search:'search',admin:'admin',receive:'receive'};
+function tab(t){
+ if(t==='admin'&&!isAdmin)return;
+ for(const [k,id] of Object.entries(VIEWS))$(id).classList.toggle('hidden',k!==t);
+ for(const k of ['new','history','search','admin'])$(k+'Tab').classList.toggle('secondary',k!==t);
+ if(t==='search')runSearch();
+ window.scrollTo({top:0});
+}
+
+/* ---------- history (grouped by month / year) ---------- */
+function orderCard(o){
+ const st=statusOf(o),div=document.createElement('div');div.className='order';
+ const h=document.createElement('div');h.style.fontWeight='bold';h.textContent=`PO ${o.poNumber} · ${money(o.total)} · ${o.units} unit${o.units===1?'':'s'}`;
+ const p=document.createElement('span');p.className='pill '+st;p.textContent=st;h.append(p);
+ if(o.hasVariance){const v=document.createElement('span');v.className='pill var';v.textContent='Variance';h.append(v)}
+ div.append(h);
+ const det=document.createElement('div');det.className='muted';
+ det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
+ const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
+ const b2=document.createElement('button');b2.className='secondary';b2.textContent='PDF';b2.onclick=async()=>{try{await ensurePdf();await pdf(o)}catch(e){alert(e.message)}};div.append(b2);
+ if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
+ const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
+ for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
+ sel.onchange=async()=>{
+  const v=sel.value;
+  if(v==='Received'&&!o.receiving){sel.value=st;openReceiving(o);return}
+  if(v==='Sent'&&st==='Draft'&&!confirm(`Mark PO ${o.poNumber} as Sent? The quantities ordered will be locked.`)){sel.value=st;return}
+  if(v==='Cancelled'&&!confirm(`Cancel PO ${o.poNumber}?`)){sel.value=st;return}
+  try{await setStatus(o,v);$('historyMessage').textContent=`PO ${o.poNumber} marked ${v}.`;$('historyMessage').className=''}
+  catch(e){sel.value=st;$('historyMessage').textContent='Status change failed: '+e.message;$('historyMessage').className='error'}
+ };
+ div.append(sel);return div;
+}
+function groupSummary(orders){const n=orders.length,t=orders.reduce((s,o)=>s+(Number(o.total)||0),0),v=orders.filter(o=>o.hasVariance).length;return `${n} PO${n===1?'':'s'} · ${money(t)}${v?` · ${v} with variance`:''}`}
+function makeGroup(key,label,orders,cls,forceOpen,fill){
+ const det=document.createElement('details');det.className='group '+(cls||'');det.open=forceOpen||openGroups.has(key);
+ det.addEventListener('toggle',()=>{if(forceOpen)return;det.open?openGroups.add(key):openGroups.delete(key)});
+ const sum=document.createElement('summary');const a=document.createElement('span');a.textContent=label;const b=document.createElement('span');b.className='muted';b.textContent=groupSummary(orders);sum.append(a,b);det.append(sum);
+ const inner=document.createElement('div');inner.className='inner';fill(inner);det.append(inner);return det;
+}
+function renderHistory(){
+ const s=$('historySearch').value.trim().toLowerCase(),status=$('historyStatus').value,box=$('orders');
+ const list=history.filter(x=>(!status||statusOf(x)===status)&&[x.poNumber,x.requester,x.shipTo].join(' ').toLowerCase().includes(s))
+  .sort((a,b)=>orderDateStr(b).localeCompare(orderDateStr(a))||Number(b.poNumber)-Number(a.poNumber));
+ box.replaceChildren();
+ const nowYm=todayLocal().slice(0,7),nowY=nowYm.slice(0,4),forceOpen=!!(s||status);
+ const current=[],months=new Map(),years=new Map();
+ for(const o of list){const ym=orderDateStr(o).slice(0,7),y=ym.slice(0,4);
+  if(ym>=nowYm)current.push(o);
+  else if(y===nowY){if(!months.has(ym))months.set(ym,[]);months.get(ym).push(o)}
+  else{if(!years.has(y))years.set(y,new Map());const m=years.get(y);if(!m.has(ym))m.set(ym,[]);m.get(ym).push(o)}}
+ // Current month: always listed in full
+ const head=document.createElement('div');head.className='month-head';const h1=document.createElement('span');h1.textContent=monthLabel(nowYm)+' (this month)';const h2=document.createElement('span');h2.className='muted';h2.textContent=groupSummary(current);head.append(h1,h2);box.append(head);
+ if(current.length)current.forEach(o=>box.append(orderCard(o)));else{const p=document.createElement('p');p.className='muted';p.textContent=forceOpen?'No matching orders this month.':'No orders yet this month.';box.append(p)}
+ // Earlier months this year: one line each
+ for(const ym of [...months.keys()].sort().reverse())box.append(makeGroup('m'+ym,monthLabel(ym),months.get(ym),'',forceOpen,inner=>months.get(ym).forEach(o=>inner.append(orderCard(o)))));
+ // Earlier years: one line each, months inside
+ for(const y of [...years.keys()].sort().reverse()){const m=years.get(y),all=[...m.values()].flat();
+  box.append(makeGroup('y'+y,y,all,'year',forceOpen,inner=>{for(const ym of [...m.keys()].sort().reverse())inner.append(makeGroup('m'+ym,monthLabel(ym),m.get(ym),'',forceOpen,i2=>m.get(ym).forEach(o=>i2.append(orderCard(o)))))}))}
+ if(!list.length&&forceOpen){const p=document.createElement('p');p.className='muted';p.textContent='No matching orders.';box.append(p)}
+}
+
+/* ---------- receiving / variances ---------- */
+function openReceiving(o){
+ const order=history.find(h=>h.id===o.id)||o;receivingOrder=order;
+ const prev=Object.fromEntries((order.receiving?.lines||[]).map(l=>[l.id,l]));
+ $('recvTitle').textContent=(order.receiving?'Edit receiving · PO ':'Receive PO ')+order.poNumber;
+ $('recvInfo').textContent=`Ordered by ${order.requester} on ${fmtDate(orderDateStr(order))} · ${order.units} units · ${money(order.total)} · Status: ${statusOf(order)}`;
+ $('recvDate').value=order.receiving?.date||todayLocal();
+ $('recvBy').value=employeeName(currentUser);
+ $('recvNotes').value=order.receiving?.notes||'';$('recvMessage').textContent='';
+ $('recvLines').innerHTML=(order.lines||[]).map(l=>`<div class="recv-row" data-row="${esc(l.id)}"><div><b>${esc(l.description)}</b><small>Item ${esc(l.id)} · Ordered <b>${l.qty}</b></small></div><div><label>Received</label><input type="number" min="0" step="1" inputmode="numeric" data-recv="${esc(l.id)}" value="${esc(prev[l.id]?.received??l.qty)}" aria-label="Received quantity for ${esc(l.description)}"></div><input class="recv-note" data-note="${esc(l.id)}" maxlength="200" placeholder="Variance note (short, damaged, substituted, back-ordered…)" value="${esc(prev[l.id]?.note||'')}"></div>`).join('');
+ document.querySelectorAll('[data-recv]').forEach(e=>e.addEventListener('input',updateRecvSummary));
+ updateRecvSummary();tab('receive');
+}
+function updateRecvSummary(){
+ const o=receivingOrder;if(!o)return;let short=0,over=0,lines=0;
+ for(const l of o.lines||[]){const v=Number(byData('data-recv',l.id)?.value);const row=byData('data-row',l.id);const diff=Number.isFinite(v)?v-l.qty:0;row?.classList.toggle('variance',diff!==0);if(diff){lines++;diff<0?short+=-diff:over+=diff}}
+ const s=$('recvSummary');s.classList.toggle('bad',lines>0);
+ s.textContent=lines?`Variance on ${lines} line${lines===1?'':'s'}: ${short?short+' short':''}${short&&over?', ':''}${over?over+' over':''}. Add a note explaining each difference.`:'Everything received as ordered.';
+}
+async function saveReceiving(){
+ const o=receivingOrder;if(!o)throw Error('No PO selected.');
+ const date=$('recvDate').value;if(!date)throw Error('Enter the date received.');
+ const recLines=(o.lines||[]).map(l=>{const raw=String(byData('data-recv',l.id)?.value??'').trim();if(!/^\d+$/.test(raw))throw Error(`Received quantity for item ${l.id} must be a whole number (0 or more).`);return {id:l.id,description:l.description,ordered:l.qty,received:Number(raw),note:String(byData('data-note',l.id)?.value||'').trim()}});
+ const hasVariance=recLines.some(l=>l.received!==l.ordered);
+ await updateDoc(doc(db,'orders',o.id),{receiving:{date,by:employeeName(currentUser),byEmail:currentUser.email,notes:$('recvNotes').value.trim(),lines:recLines,savedAt:serverTimestamp()},hasVariance,status:'Received',updatedAt:serverTimestamp(),updatedBy:currentUser.email});
+ receivingOrder=null;tab('history');
+ $('historyMessage').className='';$('historyMessage').textContent=`PO ${o.poNumber} received${hasVariance?' with variances logged':' complete'}.`;
+}
+
+/* ---------- PO search & reporting ---------- */
+function refreshSearchOptions(){
+ const fill=(id,opts,allLabel)=>{const sel=$(id),v=sel.value;sel.innerHTML=`<option value="">${allLabel}</option>`+opts.map(([val,label])=>`<option value="${esc(val)}">${esc(label)}</option>`).join('');if([...sel.options].some(op=>op.value===v))sel.value=v};
+ const prod=new Map(products.map(p=>[p.id,p.name]));
+ for(const o of history)for(const l of o.lines||[])if(!prod.has(l.id))prod.set(l.id,l.description);
+ fill('sProduct',[...prod].map(([id,name])=>({id,name})).sort(byItem).map(p=>[p.id,p.id+' · '+p.name]),'All products');
+ const uniq=f=>[...new Set(history.map(f).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+ fill('sStore',uniq(o=>o.shipTo).map(s=>[s,shortStore(s)]),'All stores');
+ fill('sRequester',uniq(o=>o.requester).map(s=>[s,s]),'All requesters');
+}
+function runSearch(){
+ const f={product:$('sProduct').value,store:$('sStore').value,req:$('sRequester').value,status:$('sStatus').value,po:$('sPo').value.trim(),variance:$('sVariance').value,from:$('sFrom').value,to:$('sTo').value,kw:$('sKeyword').value.trim().toLowerCase()};
+ if(f.from&&f.to&&f.from>f.to){$('searchMessage').textContent='From date is after To date.';$('searchMessage').className='error';return}
+ $('searchMessage').textContent='';$('searchMessage').className='muted';
+ const rows=[];
+ for(const o of history){
+  const date=orderDateStr(o),st=statusOf(o);
+  if(f.from&&date<f.from||f.to&&date>f.to)continue;
+  if(f.status&&st!==f.status)continue;
+  if(f.req&&o.requester!==f.req)continue;
+  if(f.store&&o.shipTo!==f.store)continue;
+  if(f.po&&!String(o.poNumber).includes(f.po))continue;
+  if(f.variance==='yes'&&!o.hasVariance||f.variance==='no'&&!(o.receiving&&!o.hasVariance)||f.variance==='pending'&&o.receiving)continue;
+  const rec=Object.fromEntries((o.receiving?.lines||[]).map(l=>[l.id,l]));
+  for(const l of o.lines||[]){
+   if(f.product&&l.id!==f.product)continue;
+   if(f.kw&&![l.id,l.description,o.notes,o.receiving?.notes,rec[l.id]?.note,o.poNumber].join(' ').toLowerCase().includes(f.kw))continue;
+   rows.push({o,date,po:o.poNumber,id:l.id,desc:l.description,qty:l.qty,rcvd:rec[l.id]?rec[l.id].received:null,note:rec[l.id]?.note||'',unit:l.unitPrice,ext:round2(l.qty*l.unitPrice),store:o.shipTo||'',requester:o.requester||'',status:st});
+  }
+ }
+ rows.sort((a,b)=>b.date.localeCompare(a.date)||Number(b.po)-Number(a.po)||byItem(a,b));
+ lastSearch=rows;
+ const pos=new Set(rows.map(r=>r.o.id)).size,units=rows.reduce((s,r)=>s+r.qty,0),value=round2(rows.reduce((s,r)=>s+r.ext,0));
+ $('tPos').textContent=pos;$('tUnits').textContent=units;$('tValue').textContent=money(value);$('tRows').textContent=rows.length;
+ const body=$('sBody');body.replaceChildren();
+ if(!rows.length){body.innerHTML='<tr><td colspan="12" class="muted">No matching PO lines.</td></tr>';$('sFoot').innerHTML='';return}
+ for(const r of rows){
+  const tr=document.createElement('tr');
+  const varCls=r.rcvd!=null&&r.rcvd!==r.qty?' bad':'';
+  tr.innerHTML=`<td>${esc(fmtDate(r.date))}</td><td><b>${esc(r.po)}</b></td><td>${esc(r.id)}</td><td>${esc(r.desc)}</td><td class="num">${r.qty}</td><td class="num${varCls}" title="${esc(r.note)}">${r.rcvd==null?'—':r.rcvd}</td><td class="num">${money(r.unit)}</td><td class="num">${money(r.ext)}</td><td class="store" title="${esc(r.store)}">${esc(shortStore(r.store))}</td><td>${esc(r.requester)}</td><td><span class="pill ${esc(r.status)}" style="margin:0">${esc(r.status)}</span></td><td></td>`;
+  const b=document.createElement('button');b.textContent='Open';b.onclick=()=>load(r.o);tr.lastElementChild.append(b);
+  body.append(tr);
+ }
+ $('sFoot').innerHTML=`<tr><td colspan="4">Totals</td><td class="num">${units}</td><td></td><td></td><td class="num">${money(value)}</td><td colspan="4"></td></tr>`;
+}
+function searchFilterText(){
+ const parts=[];const sel=id=>$(id).selectedOptions[0]?.textContent;
+ if($('sProduct').value)parts.push('Product: '+sel('sProduct'));if($('sStore').value)parts.push('Store: '+sel('sStore'));if($('sRequester').value)parts.push('Requested by: '+$('sRequester').value);if($('sStatus').value)parts.push('Status: '+$('sStatus').value);if($('sPo').value.trim())parts.push('PO: '+$('sPo').value.trim());if($('sVariance').value)parts.push('Receiving: '+sel('sVariance'));if($('sFrom').value)parts.push('From '+fmtDate($('sFrom').value));if($('sTo').value)parts.push('To '+fmtDate($('sTo').value));if($('sKeyword').value.trim())parts.push('Keyword: '+$('sKeyword').value.trim());
+ return parts.length?parts.join(' | '):'All POs';
+}
+function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+async function exportExcel(){
+ if(!lastSearch.length)throw Error('Run a search with results first.');
+ const data=lastSearch.map(r=>({'Date':fmtDate(r.date),'PO #':Number(r.po)||String(r.po),'Item':r.id,'Description':r.desc,'Qty ordered':r.qty,'Qty received':r.rcvd??'','Variance':r.rcvd==null?'':r.rcvd-r.qty,'Unit price':r.unit,'Extended':r.ext,'Ship to':r.store,'Requested by':r.requester,'Status':r.status,'Receiving note':r.note}));
+ const name='Coffee-PO-Search-'+todayLocal();
+ try{
+  await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
+  const ws=XLSX.utils.json_to_sheet(data);ws['!cols']=[10,8,9,34,11,12,9,10,11,40,18,10,30].map(w=>({wch:w}));
+  const n=data.length+1;for(let r=2;r<=n;r++)for(const c of ['H','I']){const cell=ws[c+r];if(cell)cell.z='$#,##0.00'}
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'PO lines');XLSX.writeFile(wb,name+'.xlsx');
+  $('searchMessage').textContent='Excel file downloaded.';
+ }catch(e){
+  console.warn('SheetJS unavailable, exporting CSV',e);
+  const cols=Object.keys(data[0]),q=v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  downloadBlob(new Blob(['﻿'+[cols.join(','),...data.map(r=>cols.map(c=>q(r[c])).join(','))].join('\r\n')],{type:'text/csv'}),name+'.csv');
+  $('searchMessage').textContent='Excel library unavailable, so a CSV file (opens in Excel) was downloaded instead.';
+ }
+}
+async function exportSearchPdf(){
+ if(!lastSearch.length)throw Error('Run a search with results first.');
+ await ensurePdf();
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'landscape'});const L=30,R=762,BOTTOM=548;let y=40;
+ d.setTextColor(25,53,45);d.setFont('helvetica','bold');d.setFontSize(15);d.text("McCoy's - Community Coffee PO Search Report",L,y);y+=18;
+ d.setFont('helvetica','normal');d.setFontSize(9);d.text(pdfSafe(`Generated ${new Date().toLocaleString()} by ${employeeName(currentUser)}`),L,y);y+=13;
+ const ft=d.splitTextToSize(pdfSafe('Filters: '+searchFilterText()),R-L);d.text(ft,L,y);y+=ft.length*11+4;
+ const pos=new Set(lastSearch.map(r=>r.o.id)).size,units=lastSearch.reduce((s,r)=>s+r.qty,0),value=lastSearch.reduce((s,r)=>s+r.ext,0);
+ d.setFont('helvetica','bold');d.text(`POs: ${pos}     Lines: ${lastSearch.length}     Units: ${units}     Value: ${money(value)}`,L,y);y+=16;
+ const C={date:L,po:84,item:122,desc:166,descW:214,qty:418,rcvd:456,unit:512,ext:574,req:584,reqW:92,status:684};
+ const head=()=>{d.setFillColor(0,84,59);d.rect(L,y-11,R-L,17,'F');d.setTextColor(255,210,0);d.setFont('helvetica','bold');d.setFontSize(8.5);d.text('DATE',C.date+3,y);d.text('PO',C.po,y);d.text('ITEM',C.item,y);d.text('DESCRIPTION',C.desc,y);d.text('QTY',C.qty,y,{align:'right'});d.text('RCVD',C.rcvd,y,{align:'right'});d.text('UNIT',C.unit,y,{align:'right'});d.text('EXTENDED',C.ext,y,{align:'right'});d.text('REQUESTED BY',C.req,y);d.text('STATUS',C.status,y);y+=17;d.setTextColor(25,53,45);d.setFont('helvetica','normal');d.setFontSize(8.5)};
+ head();
+ for(const r of lastSearch){
+  const desc=d.splitTextToSize(pdfSafe(r.desc),C.descW),req=d.splitTextToSize(pdfSafe(r.requester),C.reqW),h=Math.max(desc.length,req.length)*10.5+5;
+  if(y+h>BOTTOM){d.addPage();y=40;head()}
+  d.text(fmtDate(r.date),C.date+3,y);d.text(String(r.po),C.po,y);d.text(pdfSafe(r.id).slice(0,10),C.item,y);d.text(desc,C.desc,y);d.text(String(r.qty),C.qty,y,{align:'right'});
+  if(r.rcvd!=null){if(r.rcvd!==r.qty){d.setTextColor(161,37,37);d.setFont('helvetica','bold')}d.text(String(r.rcvd),C.rcvd,y,{align:'right'});d.setTextColor(25,53,45);d.setFont('helvetica','normal')}else d.text('-',C.rcvd,y,{align:'right'});
+  d.text(money(r.unit),C.unit,y,{align:'right'});d.text(money(r.ext),C.ext,y,{align:'right'});d.text(req,C.req,y);d.text(r.status,C.status,y);
+  y+=h;d.setDrawColor(228,235,231);d.line(L,y-9,R,y-9);
+ }
+ if(y+20>BOTTOM){d.addPage();y=40}
+ d.setDrawColor(0,84,59);d.line(L,y-6,R,y-6);d.setFont('helvetica','bold');d.text('TOTALS',C.date+3,y+6);d.text(String(units),C.qty,y+6,{align:'right'});d.text(money(value),C.ext,y+6,{align:'right'});
+ footer(d,'Prices shown are the unit prices stored on each PO. Estimates only.');
+ d.save('Coffee-PO-Search-'+todayLocal()+'.pdf');$('searchMessage').textContent='PDF report downloaded.';
+}
+
+/* ---------- admin ---------- */
 function renderAdmin(){
  if(!isAdmin)return;
- $('adminProducts').innerHTML=products.map(x=>`<div class="admin-row"><div><label for="name-${esc(x.id)}">Product name · Item ${esc(x.id)}</label><input id="name-${esc(x.id)}" type="text" maxlength="140" value="${esc(Object.prototype.hasOwnProperty.call(nameDrafts,x.id)?nameDrafts[x.id]:x.name)}"><small>${x.category==='free'?'Free merchandise':'Paid merchandise'} · Item number cannot be changed</small></div><div><label for="price-${esc(x.id)}">Unit price</label><input id="price-${esc(x.id)}" type="number" min="0" max="9999999" step="0.01" inputmode="decimal" value="${esc(Object.prototype.hasOwnProperty.call(priceDrafts,x.id)?priceDrafts[x.id]:x.price.toFixed(2))}" ${x.category==='free'?'disabled':''}></div></div>`).join('');
+ $('adminProducts').innerHTML=products.map(x=>`<div class="admin-row"><div><label for="name-${esc(x.id)}">Product name · Item ${esc(x.id)}</label><input id="name-${esc(x.id)}" type="text" maxlength="140" value="${esc(Object.prototype.hasOwnProperty.call(nameDrafts,x.id)?nameDrafts[x.id]:x.name)}"><small>${x.category==='free'?'Free merchandise':'Paid merchandise'} · Item number cannot be changed</small></div><div><label for="price-${esc(x.id)}">Unit price</label><input id="price-${esc(x.id)}" type="number" min="0" max="9999999" step="0.01" inputmode="decimal" value="${esc(Object.prototype.hasOwnProperty.call(priceDrafts,x.id)?priceDrafts[x.id]:Number(x.price).toFixed(2))}" ${x.category==='free'?'disabled':''}></div></div>`).join('');
  for(const x of products){
   $('name-'+x.id).addEventListener('input',e=>{nameDrafts[x.id]=e.target.value;$('adminMessage').textContent='Unsaved product changes. Click Save product changes to apply.'});
   if(x.category!=='free')$('price-'+x.id).addEventListener('input',e=>{priceDrafts[x.id]=e.target.value;$('adminMessage').textContent='Unsaved product changes. Click Save product changes to apply.'});
  }
+ if(document.activeElement!==$('vendorEmail'))$('vendorEmail').value=vendorEmail;
 }
 async function addProduct(){
  if(!isAdmin)throw Error('Administrator permission required.');
  if(!catalogLoaded)throw Error('Catalog is still loading. Please try again.');
- const id=$('newItemId').value.trim(),name=$('newItemName').value.trim(),category=$('newItemCategory').value;
- const price=Number($('newItemPrice').value);
+ const id=$('newItemId').value.trim(),name=$('newItemName').value.trim(),category=$('newItemCategory').value,price=Number($('newItemPrice').value);
  if(!/^[A-Za-z0-9_-]{1,64}$/.test(id))throw Error('Item number must use letters, numbers, hyphens, or underscores.');
  if(!name||name.length>140)throw Error('Enter a description of 1–140 characters.');
  if(!['paid','free'].includes(category))throw Error('Select a valid merchandise section.');
@@ -46,12 +594,8 @@ async function addProduct(){
  if(category==='free'&&price!==0)throw Error('Free merchandise must have a $0.00 price.');
  if(products.some(p=>p.id===id))throw Error('That item number already exists. Change its price in the list above.');
  const itemRef=doc(db,'catalog',id);
- await runTransaction(db,async tx=>{
-   const existing=await tx.get(itemRef);
-   if(existing.exists())throw Error('That item number is already in the catalog.');
-   tx.set(itemRef,{id,name,category,price,updatedBy:currentUser.uid,updatedAt:serverTimestamp()});
- });
- $('addProductForm').reset();$('newItemPrice').value='0.00';
+ await runTransaction(db,async tx=>{const existing=await tx.get(itemRef);if(existing.exists())throw Error('That item number is already in the catalog.');tx.set(itemRef,{id,name,category,price,updatedBy:currentUser.uid,updatedAt:serverTimestamp()})});
+ $('addProductForm').reset();$('newItemPrice').value='0.00';$('newItemPrice').disabled=false;
  $('addProductMessage').textContent='Product added. It will appear in the order form automatically.';
 }
 async function savePrices(){
@@ -59,28 +603,84 @@ async function savePrices(){
  if(!catalogLoaded)throw Error('Catalog is still loading. Please try again.');
  const changed=[];
  for(const item of products){
-  const hasName=Object.prototype.hasOwnProperty.call(nameDrafts,item.id);
-  const hasPrice=Object.prototype.hasOwnProperty.call(priceDrafts,item.id);
+  const hasName=Object.prototype.hasOwnProperty.call(nameDrafts,item.id),hasPrice=Object.prototype.hasOwnProperty.call(priceDrafts,item.id);
   if(!hasName&&!hasPrice)continue;
   const name=hasName?String(nameDrafts[item.id]).trim():item.name;
   if(!name||name.length>140)throw Error('Item '+item.id+': Product name must be 1–140 characters.');
   let price=item.price;
-  if(hasPrice&&item.category!=='free'){
-   const raw=String(priceDrafts[item.id]).trim();
-   if(!/^\d+(?:\.\d{1,2})?$/.test(raw))throw Error('Item '+item.id+': Enter a valid price with up to two decimal places.');
-   price=Number(raw);
-   if(!Number.isFinite(price)||price>9999999)throw Error('Item '+item.id+': Price must be between $0.00 and $9,999,999.00.');
-  }
+  if(hasPrice&&item.category!=='free'){const raw=String(priceDrafts[item.id]).trim();if(!/^\d+(?:\.\d{1,2})?$/.test(raw))throw Error('Item '+item.id+': Enter a valid price with up to two decimal places.');price=Number(raw);if(!Number.isFinite(price)||price>9999999)throw Error('Item '+item.id+': Price must be between $0.00 and $9,999,999.00.')}
   if(name!==item.name||Math.round(price*100)!==Math.round(item.price*100))changed.push({...item,name,price});
  }
- if(!changed.length){priceDrafts={};nameDrafts={};renderAdmin();$('adminMessage').textContent='No product changes to save.';return;}
+ if(!changed.length){priceDrafts={};nameDrafts={};renderAdmin();$('adminMessage').textContent='No product changes to save.';return}
  const batch=writeBatch(db);
  for(const item of changed)batch.set(doc(db,'catalog',item.id),{id:item.id,name:item.name,price:item.category==='free'?0:item.price,category:item.category,updatedAt:serverTimestamp(),updatedBy:currentUser.uid},{merge:true});
  await batch.commit();
  for(const item of changed){delete priceDrafts[item.id];delete nameDrafts[item.id]}
  $('adminMessage').textContent=`Saved ${changed.length} updated product${changed.length===1?'':'s'} to Firebase. New orders will use the updated details.`;
 }
-function renderHistory(){const s=$('historySearch').value.toLowerCase(),status=$('historyStatus').value;const list=history.filter(x=>(!status||x.status===status)&&[x.poNumber,x.requester,x.shipTo].join(' ').toLowerCase().includes(s));$('orders').replaceChildren();if(!list.length){$('orders').textContent='No matching orders.';return}for(const o of list){const div=document.createElement('div');div.className='order';const heading=document.createElement('div');heading.textContent=`${o.poNumber} · ${money(o.total)} · ${o.units} units`;heading.style.fontWeight='bold';div.append(heading);const detail=document.createElement('div');detail.className='muted';detail.textContent=`${o.requester} · ${o.status||'Draft'} · ${o.createdAt?.toDate?.().toLocaleDateString()||'Pending'}`;div.append(detail);const b1=document.createElement('button');b1.textContent='View / edit';b1.onclick=()=>load(o,o.id);div.append(b1);const b2=document.createElement('button');b2.className='secondary';b2.textContent='Download PDF';b2.onclick=async()=>{try{await ensurePdf();await pdf(o)}catch(e){alert(e.message)}};div.append(b2);const sel=document.createElement('select');sel.style.cssText='display:inline-block;width:auto;margin:5px';for(const v of ['Draft','Sent','Received','Cancelled']){const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=o.status===v;sel.append(op)}sel.onchange=async()=>{try{await updateDoc(doc(db,'orders',o.id),{status:sel.value,updatedAt:serverTimestamp(),updatedBy:currentUser.email})}catch(e){alert(e.message)}};div.append(sel);$('orders').append(div)}}
-renderProducts();clear();$('newTab').onclick=()=>tab('new');$('historyTab').onclick=()=>tab('history');$('adminTab').onclick=()=>tab('admin');$('newItemCategory').onchange=()=>{if($('newItemCategory').value==='free'){$('newItemPrice').value='0.00';$('newItemPrice').disabled=true}else{$('newItemPrice').disabled=false}};$('addProductForm').onsubmit=async e=>{e.preventDefault();const btn=$('addProduct');btn.disabled=true;try{await addProduct()}catch(err){$('addProductMessage').textContent=err.message}finally{btn.disabled=false}};$('savePrices').onclick=async()=>{const button=$('savePrices');button.disabled=true;$('adminMessage').textContent='Saving product changes…';try{await savePrices()}catch(e){$('adminMessage').textContent='Product save failed: '+e.message}finally{button.disabled=false}};$('clearOrder').onclick=()=>{lastSavedOrder=null;clear()};$('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;$('saveOrder').onclick=async()=>{try{await save()}catch(e){msg(e.message,true)}};$('pdfOrder').onclick=async()=>{try{if(!activeId&&!lastSavedOrder)throw Error('Save an order first to assign a PO number.');await ensurePdf();await pdf(activeId?getOrder():lastSavedOrder);msg('PDF generated. Check your browser downloads.')}catch(e){msg(e.message,true)}};$('emailOrder').onclick=async()=>{try{if(!activeId&&!lastSavedOrder)throw Error('Save an order first to assign a PO number.');const o=activeId?getOrder():lastSavedOrder;await ensurePdf();await pdf(o);email(o);msg('PDF generated. Attach the downloaded PDF to your email before sending.')}catch(e){msg(e.message,true)}};
-if(!config?.apiKey||config.apiKey==='PASTE_API_KEY'){$('setup').classList.remove('hidden')}else{try{const app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);$('loginForm').onsubmit=async e=>{e.preventDefault();try{await signInWithEmailAndPassword(auth,$('email').value,$('password').value)}catch(err){alert('Sign in failed: '+err.message)}};$('resetPassword').onclick=async()=>{const email=$('email').value.trim();const status=$('resetStatus');status.textContent='';if(!email){status.textContent='Enter your account email above, then click Forgot password?';$('email').focus();return}if(!$('email').checkValidity()){status.textContent='Enter a valid email address.';$('email').focus();return}const button=$('resetPassword');button.disabled=true;try{await sendPasswordResetEmail(auth,email);status.textContent='If this email has an account, a password-reset link will be sent. Check your inbox and spam folder.'}catch(err){console.error('Password reset error',err);status.textContent=err.code==='auth/invalid-email'?'Enter a valid email address.':err.code==='auth/too-many-requests'?'Too many attempts. Please try again later.':'Could not request a reset email. Please try again or contact your administrator.'}finally{button.disabled=false}};$('signout').onclick=()=>signOut(auth);onAuthStateChanged(auth,user=>{currentUser=user;$('auth').classList.toggle('hidden',!!user);$('app').classList.toggle('hidden',!user);if(unsubscribe){unsubscribe();unsubscribe=null}if(unsubCatalog){unsubCatalog();unsubCatalog=null}isAdmin=false;catalogLoaded=false;priceDrafts={};nameDrafts={};lastSavedOrder=null;$('adminTab').classList.add('hidden');tab('new');if(user){clear();$('who').textContent=user.email;getDoc(doc(db,'admins',user.uid)).then(a=>{if(currentUser?.uid!==user.uid)return;isAdmin=a.exists()&&a.data()?.enabled===true;$('adminTab').classList.toggle('hidden',!isAdmin);renderAdmin()}).catch(e=>console.error('Admin check failed',e));unsubCatalog=onSnapshot(collection(db,'catalog'),snap=>{if(currentUser?.uid!==user.uid)return;const map=new Map(snap.docs.map(x=>[x.id,x.data()]));const base=defaults.map(([id,name,price,category])=>{const v=map.get(id);return {id,name:v?.name||name,price:category==='free'?0:(typeof v?.price==='number'?v.price:price),category}});const known=new Set(defaults.map(x=>x[0]));const additions=snap.docs.filter(d=>!known.has(d.id)).map(d=>({id:d.id,...d.data()})).filter(x=>x.id&&x.name&&['paid','free'].includes(x.category)&&typeof x.price==='number').map(x=>({...x,price:x.category==='free'?0:x.price})).sort((a,b)=>a.id.localeCompare(b.id));products=[...base,...additions].sort((a,b)=>{const an=Number(a.id),bn=Number(b.id);return Number.isFinite(an)&&Number.isFinite(bn)?an-bn:a.id.localeCompare(b.id,undefined,{numeric:true})});catalogLoaded=true;renderProducts();renderAdmin()},err=>alert('Could not load catalog: '+err.message));unsubscribe=onSnapshot(query(collection(db,'orders'),orderBy('createdAt','desc')),snap=>{history=snap.docs.map(d=>({id:d.id,...d.data()}));renderHistory()},err=>alert('Could not load orders: '+err.message))}else{history=[];clear()}})}catch(e){$('setup').classList.remove('hidden');$('setup').append(document.createTextNode(' Firebase error: '+e.message))}}
-</script></body></html>
+async function saveVendor(){
+ if(!isAdmin)throw Error('Administrator permission required.');
+ const list=$('vendorEmail').value.split(',').map(s=>s.trim()).filter(Boolean);
+ if(list.some(e=>!/^[^\s@,;<>]+@[^\s@,;<>]+\.[A-Za-z]{2,}$/.test(e)))throw Error('Enter valid email addresses separated by commas.');
+ const email=list.join(', ');
+ if(email.length>300)throw Error('Too many addresses (300 characters max).');
+ await setDoc(doc(db,'settings','vendor'),{email,updatedBy:currentUser.email,updatedAt:serverTimestamp()});
+ vendorEmail=email;$('vendorEmail').value=email;
+ $('vendorMessage').textContent=email?'Vendor email saved. Email PDF will address drafts to '+email+'.':'Vendor email cleared.';
+}
+
+/* ---------- wiring ---------- */
+const guard=(btn,fn,onErr)=>async(...a)=>{btn.disabled=true;try{await fn(...a)}catch(e){onErr(e)}finally{btn.disabled=false}};
+renderProducts({});clear();
+$('newTab').onclick=()=>tab('new');$('historyTab').onclick=()=>tab('history');$('searchTab').onclick=()=>tab('search');$('adminTab').onclick=()=>tab('admin');
+$('newItemCategory').onchange=()=>{const free=$('newItemCategory').value==='free';if(free)$('newItemPrice').value='0.00';$('newItemPrice').disabled=free};
+$('addProductForm').onsubmit=e=>{e.preventDefault();guard($('addProduct'),addProduct,err=>$('addProductMessage').textContent=err.message)()};
+$('savePrices').onclick=guard($('savePrices'),async()=>{$('adminMessage').textContent='Saving product changes…';await savePrices()},e=>$('adminMessage').textContent='Product save failed: '+e.message);
+$('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').textContent='Save failed: '+e.message);
+$('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
+$('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
+$('saveOrder').onclick=guard($('saveOrder'),save,e=>msg(e.message,true));
+$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);msg((saved?'PO '+order.poNumber+' saved and ':'PO '+order.poNumber+' ')+'PDF downloaded. Check your downloads.'+(saved?' Form cleared for the next order.':''))},e=>msg(e.message,true));
+$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(e.message,true));
+$('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+e.message,true));
+$('receiveFromForm').onclick=()=>lockedOrder&&openReceiving(lockedOrder);
+$('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{$('recvMessage').textContent=e.message;$('recvMessage').className='error'});
+$('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
+$('sRun').onclick=runSearch;
+for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});
+$('sClear').onclick=()=>{for(const id of ['sProduct','sStore','sRequester','sStatus','sPo','sVariance','sFrom','sTo','sKeyword'])$(id).value='';runSearch()};
+$('sExcel').onclick=guard($('sExcel'),exportExcel,e=>{$('searchMessage').textContent=e.message;$('searchMessage').className='error'});
+$('sPdf').onclick=guard($('sPdf'),exportSearchPdf,e=>{$('searchMessage').textContent=e.message;$('searchMessage').className='error'});
+
+if(!config?.apiKey||config.apiKey==='PASTE_API_KEY'){$('setup').classList.remove('hidden')}else{try{
+ const app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);
+ $('loginForm').onsubmit=async e=>{e.preventDefault();try{await signInWithEmailAndPassword(auth,$('email').value,$('password').value)}catch(err){alert('Sign in failed: '+err.message)}};
+ $('resetPassword').onclick=async()=>{const email=$('email').value.trim(),status=$('resetStatus');status.textContent='';if(!email){status.textContent='Enter your account email above, then click Forgot password?';$('email').focus();return}if(!$('email').checkValidity()){status.textContent='Enter a valid email address.';$('email').focus();return}const button=$('resetPassword');button.disabled=true;try{await sendPasswordResetEmail(auth,email);status.textContent='If this email has an account, a password-reset link will be sent. Check your inbox and spam folder.'}catch(err){console.error('Password reset error',err);status.textContent=err.code==='auth/invalid-email'?'Enter a valid email address.':err.code==='auth/too-many-requests'?'Too many attempts. Please try again later.':'Could not request a reset email. Please try again or contact your administrator.'}finally{button.disabled=false}};
+ $('signout').onclick=()=>signOut(auth);
+ onAuthStateChanged(auth,user=>{
+  currentUser=user;$('auth').classList.toggle('hidden',!!user);$('app').classList.toggle('hidden',!user);
+  if(unsubscribe){unsubscribe();unsubscribe=null}if(unsubCatalog){unsubCatalog();unsubCatalog=null}
+  isAdmin=false;catalogLoaded=false;priceDrafts={};nameDrafts={};lastSavedOrder=null;vendorEmail='';updateMarkSent();$('adminTab').classList.add('hidden');tab('new');
+  if(!user){history=[];clear();return}
+  clear();$('who').textContent=user.email;
+  getDoc(doc(db,'settings','vendor')).then(v=>{if(currentUser?.uid!==user.uid)return;vendorEmail=v.exists()?String(v.data().email||''):'';renderAdmin()}).catch(e=>console.warn('Vendor email unavailable',e));
+  getDoc(doc(db,'admins',user.uid)).then(a=>{if(currentUser?.uid!==user.uid)return;isAdmin=a.exists()&&a.data()?.enabled===true;$('adminTab').classList.toggle('hidden',!isAdmin);renderAdmin();renderHistory()}).catch(e=>console.error('Admin check failed',e));
+  unsubCatalog=onSnapshot(collection(db,'catalog'),snap=>{
+   if(currentUser?.uid!==user.uid)return;
+   const map=new Map(snap.docs.map(x=>[x.id,x.data()]));
+   const base=defaults.map(([id,name,price,category])=>{const v=map.get(id);return {id,name:v?.name||name,price:category==='free'?0:(typeof v?.price==='number'?v.price:price),category}});
+   const known=new Set(defaults.map(x=>x[0]));
+   const additions=snap.docs.filter(d=>!known.has(d.id)).map(d=>({id:d.id,...d.data()})).filter(x=>x.id&&x.name&&['paid','free'].includes(x.category)&&typeof x.price==='number').map(x=>({...x,price:x.category==='free'?0:x.price}));
+   products=[...base,...additions].sort(byItem);catalogLoaded=true;renderProducts();renderAdmin();refreshSearchOptions();
+  },err=>alert('Could not load catalog: '+err.message));
+  unsubscribe=onSnapshot(query(collection(db,'orders'),orderBy('createdAt','desc')),snap=>{
+   history=snap.docs.map(d=>({id:d.id,...d.data()}));
+   if(lockedOrder){const fresh=history.find(h=>h.id===lockedOrder.id);if(fresh)lockedOrder=fresh}
+   renderHistory();refreshSearchOptions();updateMarkSent();
+   if(!$('search').classList.contains('hidden'))runSearch();
+  },err=>alert('Could not load orders: '+err.message));
+ });
+}catch(e){$('setup').classList.remove('hidden');$('setup').append(document.createTextNode(' Firebase error: '+e.message))}}
+</script>
+</body>
+</html>

@@ -2,11 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function admin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true; }
+    function admin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
+    }
+    function counterPath() { return /databases/$(database)/documents/settings/poCounter; }
+    function changedKeys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
     match /admins/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false; // Create/change admins manually in Firebase console.
     }
+
     match /catalog/{itemId} {
       allow read: if signedIn();
       allow create, update: if admin() && request.resource.data.id == itemId
@@ -15,21 +23,63 @@ service cloud.firestore {
         && (request.resource.data.category != 'free' || request.resource.data.price == 0);
       allow delete: if false;
     }
+
     match /settings/{settingId} {
-      allow read: if signedIn() && settingId == 'poCounter';
-      allow create: if signedIn() && settingId == 'poCounter' && request.resource.data.keys().hasOnly(['lastNumber']) && request.resource.data.lastNumber == 9001;
-      allow update: if signedIn() && settingId == 'poCounter' && request.resource.data.keys().hasOnly(['lastNumber']) && request.resource.data.lastNumber == resource.data.lastNumber + 1;
+      allow read: if signedIn() && settingId in ['poCounter', 'vendor'];
+
+      // PO counter: may only move forward by 1, and only in the same write that
+      // creates the order whose document ID is the new PO number (no skipped numbers).
+      allow create: if signedIn() && settingId == 'poCounter'
+        && request.resource.data.keys().hasOnly(['lastNumber'])
+        && request.resource.data.lastNumber == 9001
+        && existsAfter(/databases/$(database)/documents/orders/9001);
+      allow update: if signedIn() && settingId == 'poCounter'
+        && request.resource.data.keys().hasOnly(['lastNumber'])
+        && request.resource.data.lastNumber == resource.data.lastNumber + 1
+        && existsAfter(/databases/$(database)/documents/orders/$(string(request.resource.data.lastNumber)));
+
+      // Vendor email used by Email PDF: admins only.
+      allow create, update: if settingId == 'vendor' && admin()
+        && request.resource.data.keys().hasOnly(['email', 'updatedBy', 'updatedAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 300;
+
       allow delete: if false;
     }
+
     match /orders/{orderId} {
       allow read: if signedIn();
+
+      // New orders: document ID = PO number = next counter value.
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status == 'Draft'
-        && request.resource.data.poNumber == getAfter(/databases/$(database)/documents/settings/poCounter).data.lastNumber;
-      allow update: if signedIn()
-        && request.resource.data.createdBy == resource.data.createdBy
-        && (admin() || resource.data.createdBy == request.auth.uid);
+        && request.resource.data.poNumber is int
+        && orderId == string(request.resource.data.poNumber)
+        && getAfter(counterPath()).data.lastNumber == request.resource.data.poNumber
+        && ((exists(counterPath()) && get(counterPath()).data.lastNumber + 1 == request.resource.data.poNumber)
+            || (!exists(counterPath()) && request.resource.data.poNumber == 9001));
+
+      allow update: if signedIn() && (
+        // 1) Editing a Draft: creator or admin only. PO number, creator, status and receiving untouched.
+        (resource.data.status == 'Draft'
+          && (admin() || resource.data.createdBy == request.auth.uid)
+          && !changedKeys().hasAny(['createdBy', 'createdAt', 'poNumber', 'status', 'receiving', 'hasVariance', 'sentAt', 'sentBy']))
+        ||
+        // 2) Status change: any signed-in employee, status fields only.
+        //    Once a PO leaves Draft (Sent/Received/Cancelled) only an admin can put it back to Draft.
+        //    'Received' is set through the receiving log, or re-selected once a receiving log exists.
+        (changedKeys().hasOnly(['status', 'updatedAt', 'updatedBy', 'sentAt', 'sentBy'])
+          && request.resource.data.status in ['Draft', 'Sent', 'Received', 'Cancelled']
+          && (request.resource.data.status != 'Draft' || resource.data.status == 'Draft' || admin())
+          && (request.resource.data.status != 'Received' || 'receiving' in resource.data))
+        ||
+        // 3) Receiving log / variances: any signed-in employee, on Sent or Received POs.
+        //    Ordered lines and totals cannot change.
+        (resource.data.status in ['Sent', 'Received']
+          && request.resource.data.status == 'Received'
+          && changedKeys().hasOnly(['receiving', 'hasVariance', 'status', 'updatedAt', 'updatedBy']))
+      );
       allow delete: if false;
     }
   }
