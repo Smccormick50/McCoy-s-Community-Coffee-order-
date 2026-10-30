@@ -220,6 +220,7 @@ const byData=(attr,id)=>[...document.querySelectorAll(`[${attr}]`)].find(e=>e.ge
 const canEdit=o=>statusOf(o)==='Draft'&&(isAdmin||o.createdBy===currentUser?.uid);
 const shortStore=s=>String(s||'').replace(/^McCoy'?s Building Supply\s*-\s*/i,'');
 function employeeName(user){const prefix=(user?.email||'').split('@')[0].toLowerCase();return user?.displayName||employeeNames[prefix]||prefix.split(/[._-]/).filter(Boolean).map(v=>v[0].toUpperCase()+v.slice(1)).join(' ')||'Employee'}
+function friendly(e){const m=String(e?.message||e);return e?.code==='permission-denied'||/insufficient permissions/i.test(m)?'Firebase blocked this save (permission denied). Make sure the v12 firestore.rules are published in Firebase Console > Firestore Database > Rules, then reload this page and try again.':m}
 function msg(t,bad=false){$('message').textContent=t;$('message').className=bad?'error':''}
 function loadScript(src,ready){if(ready())return Promise.resolve();return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=()=>ready()?resolve():reject(Error('Library failed to initialize: '+src));s.onerror=()=>reject(Error('Could not load '+src+'. Check your internet connection.'));document.head.append(s)})}
 let pdfLoading;
@@ -417,7 +418,7 @@ function orderCard(o){
   if(v==='Sent'&&st==='Draft'&&!confirm(`Mark PO ${o.poNumber} as Sent? The quantities ordered will be locked.`)){sel.value=st;return}
   if(v==='Cancelled'&&!confirm(`Cancel PO ${o.poNumber}?`)){sel.value=st;return}
   try{await setStatus(o,v);$('historyMessage').textContent=`PO ${o.poNumber} marked ${v}.`;$('historyMessage').className=''}
-  catch(e){sel.value=st;$('historyMessage').textContent='Status change failed: '+e.message;$('historyMessage').className='error'}
+  catch(e){sel.value=st;$('historyMessage').textContent='Status change failed: '+friendly(e);$('historyMessage').className='error'}
  };
  div.append(sel);return div;
 }
@@ -455,7 +456,7 @@ function openReceiving(o){
  const order=history.find(h=>h.id===o.id)||o;receivingOrder=order;
  const prev=Object.fromEntries((order.receiving?.lines||[]).map(l=>[l.id,l]));
  $('recvTitle').textContent=(order.receiving?'Edit receiving · PO ':'Receive PO ')+order.poNumber;
- $('recvInfo').textContent=`Ordered by ${order.requester} on ${fmtDate(orderDateStr(order))} · ${order.units} units · ${money(order.total)} · Status: ${statusOf(order)}`;
+ $('recvInfo').textContent=`Ordered by ${order.requester} on ${fmtDate(orderDateStr(order))} · ${order.units} units · ${money(order.total)} · Status: ${statusOf(order)}`+(statusOf(order)==='Draft'?'. This PO was never marked Sent. Saving receiving will mark it Received and lock it.':'');
  $('recvDate').value=order.receiving?.date||todayLocal();
  $('recvBy').value=employeeName(currentUser);
  $('recvNotes').value=order.receiving?.notes||'';$('recvMessage').textContent='';
@@ -639,12 +640,12 @@ $('savePrices').onclick=guard($('savePrices'),async()=>{$('adminMessage').textCo
 $('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').textContent='Save failed: '+e.message);
 $('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
 $('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
-$('saveOrder').onclick=guard($('saveOrder'),save,e=>msg(e.message,true));
-$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);msg((saved?'PO '+order.poNumber+' saved and ':'PO '+order.poNumber+' ')+'PDF downloaded. Check your downloads.'+(saved?' Form cleared for the next order.':''))},e=>msg(e.message,true));
-$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(e.message,true));
-$('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+e.message,true));
+$('saveOrder').onclick=guard($('saveOrder'),save,e=>msg(friendly(e),true));
+$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);msg((saved?'PO '+order.poNumber+' saved and ':'PO '+order.poNumber+' ')+'PDF downloaded. Check your downloads.'+(saved?' Form cleared for the next order.':''))},e=>msg(friendly(e),true));
+$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();await pdf(order);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(friendly(e),true));
+$('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+friendly(e),true));
 $('receiveFromForm').onclick=()=>lockedOrder&&openReceiving(lockedOrder);
-$('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{$('recvMessage').textContent=e.message;$('recvMessage').className='error'});
+$('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Receiving save failed',e);$('recvMessage').textContent=friendly(e);$('recvMessage').className='error'});
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
 for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});

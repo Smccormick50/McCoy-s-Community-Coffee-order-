@@ -117,3 +117,7 @@ Note: the manifest and icons make the site eligible for a branded install; brows
 - **PO Search tab.** Filter by product, store, requester, status, PO #, receiving (variance / complete / not received), date range and keyword. Tiles show PO count, units, value and rows. Results are listed one row per product line, with received quantities in red where they differ. **Export Excel** produces an .xlsx file (or a CSV if the Excel library can't load). **Export PDF** produces a landscape report with the filters used and totals.
 
 **Test after publishing:** create a PO, use Save & create PDF, mark it Sent, confirm View no longer allows edits, log receiving with one short line, then find it in PO Search with Receiving = Variance logged.
+
+### v12.1 fix
+- Receiving can now be logged on a PO still in **Draft**, for example when someone picks Received from the status menu without marking it Sent first. Saving receiving marks it Received and locks it. **Republish `firestore.rules`.**
+- Permission errors now explain what to check instead of showing "Missing or insufficient permissions."

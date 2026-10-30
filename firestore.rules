@@ -74,9 +74,9 @@ service cloud.firestore {
           && (request.resource.data.status != 'Draft' || resource.data.status == 'Draft' || admin())
           && (request.resource.data.status != 'Received' || 'receiving' in resource.data))
         ||
-        // 3) Receiving log / variances: any signed-in employee, on Sent or Received POs.
-        //    Ordered lines and totals cannot change.
-        (resource.data.status in ['Sent', 'Received']
+        // 3) Receiving log / variances: any signed-in employee, on Draft, Sent or Received POs
+        //    (a Draft that was never marked Sent can be received directly). Ordered lines and totals cannot change.
+        (resource.data.status in ['Draft', 'Sent', 'Received']
           && request.resource.data.status == 'Received'
           && changedKeys().hasOnly(['receiving', 'hasVariance', 'status', 'updatedAt', 'updatedBy']))
       );
