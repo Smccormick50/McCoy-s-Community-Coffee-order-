@@ -188,8 +188,8 @@ body.noscroll{overflow:hidden}
 <div><label for="newItemCategory">Section</label><select id="newItemCategory"><option value="paid">Purchase items</option><option value="free">Free merchandise</option></select></div>
 <div><label for="newItemPrice">Unit price ($)</label><input id="newItemPrice" type="number" required min="0" max="9999999" step="0.01" inputmode="decimal" value="0.00"></div>
 </div><button type="submit" id="addProduct">Add product</button><p id="addProductMessage" role="status"></p></form></div>
-<div class="catalog-add"><h2>Vendor email</h2><p class="muted">Email PDF addresses drafts here. If left blank, mblackburn@communitycoffee.com is used. Separate multiple addresses with commas.</p>
-<label for="vendorEmail">Community Coffee order email</label><input id="vendorEmail" type="text" inputmode="email" maxlength="300" placeholder="mblackburn@communitycoffee.com">
+<div class="catalog-add"><h2>Vendor email</h2><p class="muted">Email PDF addresses drafts here. If left blank, Mark Blackburn &lt;mblackburn@communitycoffee.com&gt; is used. Use the format Name &lt;email&gt; or just the email; separate multiple with commas.</p>
+<label for="vendorEmail">Community Coffee order email</label><input id="vendorEmail" type="text" inputmode="email" maxlength="300" placeholder="Mark Blackburn <mblackburn@communitycoffee.com>">
 <div class="actions" style="margin-top:10px"><button type="button" id="saveVendor">Save vendor email</button></div><p id="vendorMessage" role="status"></p></div>
 </section>
 </div>
@@ -404,8 +404,11 @@ function closePdf(){$('pdfModal').classList.add('hidden');document.body.classLis
 function downloadPdf(){if(!pdfUrl)return;const a=document.createElement('a');a.href=pdfUrl;a.download=pdfName;document.body.append(a);a.click();a.remove()}
 
 /* ---------- email with the PDF attached ---------- */
-const DEFAULT_VENDOR_EMAIL='mblackburn@communitycoffee.com';
-const vendorTo=()=>(vendorEmail||DEFAULT_VENDOR_EMAIL).split(',').map(s=>s.trim()).filter(Boolean).join(', ');
+const DEFAULT_VENDOR_EMAIL='Mark Blackburn <mblackburn@communitycoffee.com>';
+// Accepts "Name <email>" or plain "email", comma separated.
+function parseRecipients(str){return String(str||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>{const m=/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(x);return m?{name:m[1].trim(),addr:m[2].trim()}:{name:'',addr:x}})}
+const recipients=()=>parseRecipients(vendorEmail||DEFAULT_VENDOR_EMAIL);
+const vendorTo=()=>recipients().map(r=>r.name?`${r.name} (${r.addr})`:r.addr).join(', ');
 const emailSubject=o=>"McCoy's Community Coffee PO "+o.poNumber;
 function emailBody(o){
  const items=(o.lines||[]).map(l=>`  ${l.qty} x ${l.id} ${l.description}`).join('\n');
@@ -418,7 +421,7 @@ function emlBlob(o,{d,filename}){
  const boundary='----=_McCoysCoffeePO_'+Date.now().toString(36);
  const pdf64=wrap76(d.output('datauristring').split(',').pop());
  const eml=[
-  'To: '+vendorTo().split(',').map(x=>'<'+x.trim()+'>').join(', '),
+  'To: '+recipients().map(r=>r.name?(/^[\x20-\x7e]*$/.test(r.name)?`"${r.name.replace(/"/g,'')}"`:'=?UTF-8?B?'+b64utf8(r.name)+'?=')+` <${r.addr}>`:`<${r.addr}>`).join(', '),
   'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o))+'?=',
   'X-Unsent: 1',
   'MIME-Version: 1.0',
@@ -446,7 +449,7 @@ async function sendEmail(o,r){
  if(phone){
   const file=new File([r.d.output('blob')],r.filename,{type:'application/pdf'});
   if(navigator.canShare({files:[file]})){
-   try{await navigator.clipboard?.writeText(vendorTo().split(',')[0])}catch{}
+   try{await navigator.clipboard?.writeText(recipients()[0]?.addr||'')}catch{}
    try{await navigator.share({files:[file],title:emailSubject(o),text:emailBody(o)});return 'shared'}
    catch(e){return e?.name==='AbortError'?'cancelled':'needtap'}
   }
@@ -739,9 +742,9 @@ async function savePrices(){
 }
 async function saveVendor(){
  if(!isAdmin)throw Error('Administrator permission required.');
- const list=$('vendorEmail').value.split(',').map(s=>s.trim()).filter(Boolean);
- if(list.some(e=>!/^[^\s@,;<>]+@[^\s@,;<>]+\.[A-Za-z]{2,}$/.test(e)))throw Error('Enter valid email addresses separated by commas.');
- const email=list.join(', ');
+ const list=parseRecipients($('vendorEmail').value);
+ if(list.some(r=>!/^[^\s@,;<>]+@[^\s@,;<>]+\.[A-Za-z]{2,}$/.test(r.addr)||/[<>",]/.test(r.name)))throw Error('Enter addresses like: Mark Blackburn <mblackburn@communitycoffee.com>, separated by commas.');
+ const email=list.map(r=>r.name?`${r.name} <${r.addr}>`:r.addr).join(', ');
  if(email.length>300)throw Error('Too many addresses (300 characters max).');
  await setDoc(doc(db,'settings','vendor'),{email,updatedBy:currentUser.email,updatedAt:serverTimestamp()});
  vendorEmail=email;$('vendorEmail').value=email;
