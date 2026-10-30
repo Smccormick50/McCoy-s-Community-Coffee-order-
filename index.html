@@ -408,6 +408,8 @@ const DEFAULT_VENDOR_EMAIL='Mark Blackburn <mblackburn@communitycoffee.com>';
 // Accepts "Name <email>" or plain "email", comma separated.
 function parseRecipients(str){return String(str||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>{const m=/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(x);return m?{name:m[1].trim(),addr:m[2].trim()}:{name:'',addr:x}})}
 const recipients=()=>parseRecipients(vendorEmail||DEFAULT_VENDOR_EMAIL);
+const CC_EMAIL='Facilities Management <facilities_management@mccoys.com>';
+const headerAddrs=list=>list.map(r=>r.name?(/^[\x20-\x7e]*$/.test(r.name)?`"${r.name.replace(/"/g,'')}"`:'=?UTF-8?B?'+b64utf8(r.name)+'?=')+` <${r.addr}>`:`<${r.addr}>`).join(', ');
 const vendorTo=()=>recipients().map(r=>r.name?`${r.name} (${r.addr})`:r.addr).join(', ');
 const emailSubject=o=>"McCoy's Community Coffee PO "+o.poNumber;
 function emailBody(o){
@@ -421,7 +423,8 @@ function emlBlob(o,{d,filename}){
  const boundary='----=_McCoysCoffeePO_'+Date.now().toString(36);
  const pdf64=wrap76(d.output('datauristring').split(',').pop());
  const eml=[
-  'To: '+recipients().map(r=>r.name?(/^[\x20-\x7e]*$/.test(r.name)?`"${r.name.replace(/"/g,'')}"`:'=?UTF-8?B?'+b64utf8(r.name)+'?=')+` <${r.addr}>`:`<${r.addr}>`).join(', '),
+  'To: '+headerAddrs(recipients()),
+  'Cc: '+headerAddrs(parseRecipients(CC_EMAIL)),
   'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o))+'?=',
   'X-Unsent: 1',
   'MIME-Version: 1.0',
@@ -459,8 +462,8 @@ async function sendEmail(o,r){
 }
 function emailResultMsg(o,res,saved){
  const pre=saved?'PO '+o.poNumber+' saved. ':'';
- if(res==='eml')return pre+`Email draft downloaded (PO-${o.poNumber}-email.eml). Open it from your downloads: Outlook opens a draft to ${vendorTo()} with the PDF attached. Send it, then mark the PO as Sent.`;
- if(res==='shared')return pre+`PDF shared. If To was blank, paste ${vendorTo()} (it was copied for you). After sending, mark the PO as Sent.`;
+ if(res==='eml')return pre+`Email draft downloaded (PO-${o.poNumber}-email.eml). Open it from your downloads: Outlook opens a draft to ${vendorTo()} (Cc Facilities Management) with the PDF attached. Send it, then mark the PO as Sent.`;
+ if(res==='shared')return pre+`PDF shared. If To was blank, paste ${vendorTo()} (it was copied for you) and Cc facilities_management@mccoys.com. After sending, mark the PO as Sent.`;
  if(res==='cancelled')return pre+'Email cancelled.';
  return pre+'Tap "Email PDF" in the viewer to attach it to an email.';
 }
