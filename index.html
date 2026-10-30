@@ -418,7 +418,7 @@ function emlBlob(o,{d,filename}){
  const boundary='----=_McCoysCoffeePO_'+Date.now().toString(36);
  const pdf64=wrap76(d.output('datauristring').split(',').pop());
  const eml=[
-  'To: '+vendorTo(),
+  'To: '+vendorTo().split(',').map(x=>'<'+x.trim()+'>').join(', '),
   'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o))+'?=',
   'X-Unsent: 1',
   'MIME-Version: 1.0',
