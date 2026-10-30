@@ -86,6 +86,7 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 .modal-bar b{overflow-wrap:anywhere}
 .modal iframe{flex:1;border:0;width:100%;background:#525659}
 body.noscroll{overflow:hidden}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(620px,92vw);background:#00382a;color:#fff;padding:13px 16px;border-radius:10px;box-shadow:0 6px 24px #0005;z-index:60;font-size:.9rem;cursor:pointer}
 @media(max-width:620px){.grid,.grid3{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:1fr 80px}.admin-row{grid-template-columns:1fr 95px}.recv-row{grid-template-columns:1fr 90px}}
 </style>
 </head>
@@ -125,7 +126,7 @@ body.noscroll{overflow:hidden}
 <div class="actions"><button id="saveOrder">Save order</button><button class="secondary" id="pdfOrder">Save &amp; view PDF</button><button class="secondary" id="emailOrder">Save &amp; email PDF</button><button class="gold hidden" id="receiveFromForm">Log receiving</button><button class="secondary" id="clearOrder">Clear form</button></div>
 <p id="message" role="status"></p>
 <div class="actions"><button class="gold hidden" id="markSent"></button></div>
-<p class="note" id="formNote">Save &amp; view PDF and Save &amp; email PDF save the order automatically first, then the form clears for the next order. Email PDF downloads the PDF and opens your email app addressed to Community Coffee. Attach the downloaded PDF before sending, then mark the PO as <b>Sent</b> to lock it.</p>
+<p class="note" id="formNote">Save &amp; view PDF and Save &amp; email PDF save the order automatically first, then the form clears for the next order. On a computer, Email PDF downloads an Outlook draft addressed to Community Coffee with the PDF already attached. Open it and press Send. On a phone, it opens the share sheet with the PDF attached. Then mark the PO as <b>Sent</b> to lock it.</p>
 </div>
 </section>
 
@@ -187,13 +188,14 @@ body.noscroll{overflow:hidden}
 <div><label for="newItemCategory">Section</label><select id="newItemCategory"><option value="paid">Purchase items</option><option value="free">Free merchandise</option></select></div>
 <div><label for="newItemPrice">Unit price ($)</label><input id="newItemPrice" type="number" required min="0" max="9999999" step="0.01" inputmode="decimal" value="0.00"></div>
 </div><button type="submit" id="addProduct">Add product</button><p id="addProductMessage" role="status"></p></form></div>
-<div class="catalog-add"><h2>Vendor email</h2><p class="muted">Email PDF opens a draft addressed here. Separate multiple addresses with commas.</p>
-<label for="vendorEmail">Community Coffee order email</label><input id="vendorEmail" type="text" inputmode="email" maxlength="300" placeholder="orders@example.com">
+<div class="catalog-add"><h2>Vendor email</h2><p class="muted">Email PDF addresses drafts here. If left blank, mblackburn@communitycoffee.com is used. Separate multiple addresses with commas.</p>
+<label for="vendorEmail">Community Coffee order email</label><input id="vendorEmail" type="text" inputmode="email" maxlength="300" placeholder="mblackburn@communitycoffee.com">
 <div class="actions" style="margin-top:10px"><button type="button" id="saveVendor">Save vendor email</button></div><p id="vendorMessage" role="status"></p></div>
 </section>
 </div>
 </main>
-<div id="pdfModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfTitle"><div class="modal-box"><div class="modal-bar"><b id="pdfTitle">PDF preview</b><div class="actions"><button id="pdfDownload">Download</button><button class="secondary" id="pdfOpen">Open in new tab</button><button class="secondary" id="pdfClose">Close</button></div></div><iframe id="pdfFrame" title="PDF preview"></iframe></div></div>
+<div id="toast" class="toast hidden" role="status" onclick="this.classList.add('hidden')"></div>
+<div id="pdfModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfTitle"><div class="modal-box"><div class="modal-bar"><b id="pdfTitle">PDF preview</b><div class="actions"><button class="gold hidden" id="pdfEmail">Email PDF</button><button id="pdfDownload">Download</button><button class="secondary" id="pdfOpen">Open in new tab</button><button class="secondary" id="pdfClose">Close</button></div></div><iframe id="pdfFrame" title="PDF preview"></iframe></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -228,6 +230,7 @@ const canEdit=o=>statusOf(o)==='Draft'&&(isAdmin||o.createdBy===currentUser?.uid
 const shortStore=s=>String(s||'').replace(/^McCoy'?s Building Supply\s*-\s*/i,'');
 function employeeName(user){const prefix=(user?.email||'').split('@')[0].toLowerCase();return user?.displayName||employeeNames[prefix]||prefix.split(/[._-]/).filter(Boolean).map(v=>v[0].toUpperCase()+v.slice(1)).join(' ')||'Employee'}
 function friendly(e){const m=String(e?.message||e);return e?.code==='permission-denied'||/insufficient permissions/i.test(m)?'Firebase blocked this save (permission denied). Make sure the v12 firestore.rules are published in Firebase Console > Firestore Database > Rules, then reload this page and try again.':m}
+let toastTimer;function toast(t){const el=$('toast');el.textContent=t;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),12000)}
 function msg(t,bad=false){$('message').textContent=t;$('message').className=bad?'error':''}
 function loadScript(src,ready){if(ready())return Promise.resolve();return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=()=>ready()?resolve():reject(Error('Library failed to initialize: '+src));s.onerror=()=>reject(Error('Could not load '+src+'. Check your internet connection.'));document.head.append(s)})}
 let pdfLoading;
@@ -344,13 +347,15 @@ async function setStatus(o,status){
 }
 
 /* ---------- PDF ---------- */
-async function logoData(filename){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);resolve({data:c.toDataURL('image/png'),ratio:img.naturalWidth/img.naturalHeight})}catch(e){reject(e)}};img.onerror=()=>reject(Error('Could not load logo: '+filename));img.src=filename})}
+const logoCache={};
+// Logos are scaled down and JPEG-compressed so PDFs stay small enough to email.
+async function logoData(filename){if(logoCache[filename])return logoCache[filename];return logoCache[filename]=new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{try{const scale=Math.min(1,700/img.naturalWidth);const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*scale);c.height=Math.round(img.naturalHeight*scale);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);resolve({data:c.toDataURL('image/jpeg',0.9),ratio:img.naturalWidth/img.naturalHeight})}catch(e){delete logoCache[filename];reject(e)}};img.onerror=()=>{delete logoCache[filename];reject(Error('Could not load logo: '+filename))};img.src=filename})}
 const pdfSafe=s=>String(s??'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...');
 function footer(d,lineA){const n=d.internal.getNumberOfPages(),w=d.internal.pageSize.getWidth(),h=d.internal.pageSize.getHeight();d.setFont('helvetica','normal');d.setFontSize(8);d.setTextColor(90,107,98);for(let i=1;i<=n;i++){d.setPage(i);d.text(lineA,42,h-37);d.text('Purchase order only - not a vendor invoice.',42,h-23);d.text(`Page ${i} of ${n}`,w-42,h-23,{align:'right'})}}
 async function pdf(o){
- const d=new window.jspdf.jsPDF({unit:'pt',format:'letter'});const L=42,R=570,BOTTOM=712;let y=42;
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',compress:true});const L=42,R=570,BOTTOM=712;let y=42;
  const ink=()=>d.setTextColor(25,53,45),red=()=>d.setTextColor(161,37,37);
- try{const [mc,cc]=await Promise.all([logoData('mccoys-logo.png'),logoData('community-logo.png')]);const w1=190,w2=151;d.addImage(mc.data,'PNG',L,31,w1,w1/mc.ratio);d.addImage(cc.data,'PNG',R-w2,31,w2,w2/cc.ratio);y=Math.max(31+w1/mc.ratio,31+w2/cc.ratio)+30}catch(e){console.warn('Logos unavailable; creating PDF without logos',e)}
+ try{const [mc,cc]=await Promise.all([logoData('mccoys-logo.png'),logoData('community-logo.png')]);const w1=190,w2=151;d.addImage(mc.data,'JPEG',L,31,w1,w1/mc.ratio);d.addImage(cc.data,'JPEG',R-w2,31,w2,w2/cc.ratio);y=Math.max(31+w1/mc.ratio,31+w2/cc.ratio)+30}catch(e){console.warn('Logos unavailable; creating PDF without logos',e)}
  ink();d.setFont('helvetica','bold');d.setFontSize(14);d.text('COMMUNITY COFFEE - PURCHASE ORDER',L,y);y+=24;
  d.setFont('helvetica','normal');d.setFontSize(10);
  const pair=(a,b)=>{d.text(pdfSafe(a),L,y);if(b)d.text(pdfSafe(b),R,y,{align:'right'});y+=16};
@@ -387,21 +392,74 @@ async function pdf(o){
  const filename='Community-Coffee-PO-'+String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')+(rec?'-received':'')+'.pdf';
  return {d,filename};
 }
-let pdfUrl=null,pdfName='';
-function showPdf({d,filename}){
+let pdfUrl=null,pdfName='',pdfDoc=null,pdfOrder=null;
+function showPdf({d,filename},order=null){
  if(pdfUrl)URL.revokeObjectURL(pdfUrl);
- pdfUrl=URL.createObjectURL(d.output('blob'));pdfName=filename;
+ pdfUrl=URL.createObjectURL(d.output('blob'));pdfName=filename;pdfDoc=d;pdfOrder=order;
  $('pdfTitle').textContent=filename;$('pdfFrame').src=pdfUrl;
+ $('pdfEmail').classList.toggle('hidden',!order);
  $('pdfModal').classList.remove('hidden');document.body.classList.add('noscroll');$('pdfDownload').focus();
 }
-function closePdf(){$('pdfModal').classList.add('hidden');document.body.classList.remove('noscroll');$('pdfFrame').src='about:blank';if(pdfUrl){const old=pdfUrl;pdfUrl=null;setTimeout(()=>URL.revokeObjectURL(old),500)}}
+function closePdf(){$('pdfModal').classList.add('hidden');document.body.classList.remove('noscroll');$('pdfFrame').src='about:blank';pdfDoc=null;pdfOrder=null;if(pdfUrl){const old=pdfUrl;pdfUrl=null;setTimeout(()=>URL.revokeObjectURL(old),500)}}
 function downloadPdf(){if(!pdfUrl)return;const a=document.createElement('a');a.href=pdfUrl;a.download=pdfName;document.body.append(a);a.click();a.remove()}
-function email(o){
- const to=vendorEmail.split(',').map(s=>s.trim()).filter(Boolean).join(',');
- const subject="McCoy's Community Coffee PO "+o.poNumber;
+
+/* ---------- email with the PDF attached ---------- */
+const DEFAULT_VENDOR_EMAIL='mblackburn@communitycoffee.com';
+const vendorTo=()=>(vendorEmail||DEFAULT_VENDOR_EMAIL).split(',').map(s=>s.trim()).filter(Boolean).join(', ');
+const emailSubject=o=>"McCoy's Community Coffee PO "+o.poNumber;
+function emailBody(o){
  const items=(o.lines||[]).map(l=>`  ${l.qty} x ${l.id} ${l.description}`).join('\n');
- const body=`Community Coffee,\n\nPlease process the attached purchase order.\n\nPO: ${o.poNumber}\nRequested by: ${o.requester}\nShip to: ${o.shipTo}\n\n${items}\n\nTotal units: ${o.units}\nEstimated total: ${money(o.total)}\n\nThank you.`;
- window.location.href='mailto:'+to+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+ return `Community Coffee,\n\nPlease process the attached purchase order.\n\nPO: ${o.poNumber}\nRequested by: ${o.requester}\nShip to: ${o.shipTo}\n\n${items}\n\nTotal units: ${o.units}\nEstimated total: ${money(o.total)}\n\nThank you.\n${employeeName(currentUser)}\nMcCoy's Building Supply`;
+}
+const b64utf8=str=>{const bytes=new TextEncoder().encode(str);let bin='';for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(bin)};
+const wrap76=b=>b.replace(/(.{76})/g,'$1\r\n');
+// Builds an unsent email (.eml). Outlook / Windows Mail open it as a draft with To, Subject, body and the PDF attached.
+function emlBlob(o,{d,filename}){
+ const boundary='----=_McCoysCoffeePO_'+Date.now().toString(36);
+ const pdf64=wrap76(d.output('datauristring').split(',').pop());
+ const eml=[
+  'To: '+vendorTo(),
+  'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o))+'?=',
+  'X-Unsent: 1',
+  'MIME-Version: 1.0',
+  `Content-Type: multipart/mixed; boundary="${boundary}"`,
+  '',
+  '--'+boundary,
+  'Content-Type: text/plain; charset="utf-8"',
+  'Content-Transfer-Encoding: base64',
+  '',
+  wrap76(b64utf8(emailBody(o).replace(/\n/g,'\r\n'))),
+  '--'+boundary,
+  `Content-Type: application/pdf; name="${filename}"`,
+  'Content-Transfer-Encoding: base64',
+  `Content-Disposition: attachment; filename="${filename}"`,
+  '',
+  pdf64,
+  '--'+boundary+'--',
+  ''
+ ].join('\r\n');
+ return new Blob([eml],{type:'message/rfc822'});
+}
+// Returns 'eml' (desktop draft downloaded), 'shared', 'cancelled', or 'needtap' (phone needs another tap to share).
+async function sendEmail(o,r){
+ const phone=matchMedia('(pointer:coarse)').matches&&!!navigator.canShare;
+ if(phone){
+  const file=new File([r.d.output('blob')],r.filename,{type:'application/pdf'});
+  if(navigator.canShare({files:[file]})){
+   try{await navigator.clipboard?.writeText(vendorTo().split(',')[0])}catch{}
+   try{await navigator.share({files:[file],title:emailSubject(o),text:emailBody(o)});return 'shared'}
+   catch(e){return e?.name==='AbortError'?'cancelled':'needtap'}
+  }
+ }
+ downloadBlob(emlBlob(o,r),`PO-${String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')}-email.eml`);
+ return 'eml';
+}
+function emailResultMsg(o,res,saved){
+ const pre=saved?'PO '+o.poNumber+' saved. ':'';
+ if(res==='eml')return pre+`Email draft downloaded (PO-${o.poNumber}-email.eml). Open it from your downloads: Outlook opens a draft to ${vendorTo()} with the PDF attached. Send it, then mark the PO as Sent.`;
+ if(res==='shared')return pre+`PDF shared. If To was blank, paste ${vendorTo()} (it was copied for you). After sending, mark the PO as Sent.`;
+ if(res==='cancelled')return pre+'Email cancelled.';
+ return pre+'Tap "Email PDF" in the viewer to attach it to an email.';
 }
 
 /* ---------- tabs ---------- */
@@ -424,7 +482,7 @@ function orderCard(o){
  const det=document.createElement('div');det.className='muted';
  det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
  const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
- const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o))}catch(e){alert(e.message)}};div.append(b2);
+ const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o),o)}catch(e){alert(e.message)}};div.append(b2);
  if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
  const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
  for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
@@ -555,7 +613,7 @@ function renderSearchTable(f){
   tr.innerHTML=`<td class="caret">${open?'&#9662;':'&#9656;'}</td><td>${esc(fmtDate(r.date))}</td><td><b>${esc(o.poNumber)}</b></td><td>${esc(o.requester)}</td><td class="num">${r.lineCount}</td><td class="num">${r.units}</td><td class="num${r.rcvdUnits!=null&&r.rcvdUnits!==r.units?' bad':''}">${r.rcvdUnits==null?'—':r.rcvdUnits}</td><td class="num">${money(r.value)}</td><td><span class="pill ${esc(r.st)}" style="margin:0">${esc(r.st)}</span></td><td class="rs ${r.rs.cls}">${esc(r.rs.text)}</td><td class="acts"></td>`;
   const acts=tr.lastElementChild;
   const bOpen=document.createElement('button');bOpen.textContent='Open';bOpen.onclick=e=>{e.stopPropagation();load(o)};
-  const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o))}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
+  const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o),o)}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
   acts.append(bOpen,bPdf);
   const toggle=()=>{open?searchExpanded.delete(o.id):searchExpanded.add(o.id);renderSearchTable(f)};
   tr.onclick=toggle;tr.title=open?'Click to hide items':'Click to show items';
@@ -606,7 +664,7 @@ async function exportExcel(){
 async function exportSearchPdf(){
  if(!lastSearch.length)throw Error('Run a search with results first.');
  await ensurePdf();
- const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'landscape'});const L=30,R=762,BOTTOM=548;let y=40;
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'landscape',compress:true});const L=30,R=762,BOTTOM=548;let y=40;
  const ink=()=>d.setTextColor(25,53,45),red=()=>d.setTextColor(161,37,37);
  ink();d.setFont('helvetica','bold');d.setFontSize(15);d.text("McCoy's - Community Coffee PO Search Report",L,y);y+=18;
  d.setFont('helvetica','normal');d.setFontSize(9);d.text(pdfSafe(`Generated ${new Date().toLocaleString()} by ${employeeName(currentUser)}`),L,y);y+=13;
@@ -701,14 +759,14 @@ $('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').t
 $('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
 $('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
 $('saveOrder').onclick=guard($('saveOrder'),save,e=>msg(friendly(e),true));
-$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();showPdf(await pdf(order));msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF opened. Use Download in the viewer to save a copy.'+(saved?' Form cleared for the next order.':''))},e=>msg(friendly(e),true));
-$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();const r=await pdf(order);r.d.save(r.filename);email(order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF downloaded and email draft opened'+(vendorEmail?'':' (no vendor email set: an admin can add it on the Admin page)')+'. Attach the PDF, send it, then mark the PO as Sent.')},e=>msg(friendly(e),true));
+$('pdfOrder').onclick=guard($('pdfOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();showPdf(await pdf(order),order);msg((saved?'PO '+order.poNumber+' saved. ':'')+'PDF opened. Use Download in the viewer to save a copy.'+(saved?' Form cleared for the next order.':''))},e=>msg(friendly(e),true));
+$('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const {order,saved}=await orderForOutput();const r=await pdf(order);const res=await sendEmail(order,r);if(res==='needtap')showPdf(r,order);const t=emailResultMsg(order,res,saved);msg(t);toast(t)},e=>msg(friendly(e),true));
 $('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+friendly(e),true));
 $('receiveFromForm').onclick=()=>lockedOrder&&openReceiving(lockedOrder);
 $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Receiving save failed',e);$('recvMessage').textContent=friendly(e);$('recvMessage').className='error'});
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
-$('pdfClose').onclick=closePdf;$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
+$('pdfClose').onclick=closePdf;$('pdfEmail').onclick=guard($('pdfEmail'),async()=>{if(!pdfOrder||!pdfDoc)return;const o=pdfOrder,res=await sendEmail(o,{d:pdfDoc,filename:pdfName});closePdf();toast(emailResultMsg(o,res,false))},e=>alert(friendly(e)));$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
 $('pdfModal').addEventListener('click',e=>{if(e.target===$('pdfModal'))closePdf()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('pdfModal').classList.contains('hidden'))closePdf()});
 for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});
 $('sClear').onclick=()=>{for(const id of ['sProduct','sStore','sRequester','sStatus','sPo','sVariance','sFrom','sTo','sKeyword'])$(id).value='';runSearch()};
