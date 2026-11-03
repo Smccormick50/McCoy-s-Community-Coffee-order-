@@ -55,6 +55,7 @@ details.year>.inner details.group{background:#fff}
 .admin-row small{display:block;color:#64766c}.admin-row input{text-align:right}
 .catalog-add{border:1px solid #c8dbcf;border-radius:12px;padding:14px;margin-top:20px;background:#f6faf7}
 .catalog-add .grid{margin-bottom:8px}
+.imp-new td{background:#eef9f1}.imp-chg td{background:#fffbe6}.imp-err td{background:#fde8e6;color:#8a322d}
 .note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}
 .lock-banner{background:#fff1e0;border-left:4px solid #c77700;padding:11px 12px;border-radius:6px;margin-bottom:14px;font-size:.9rem;font-weight:600}
 .error{color:#a12525;white-space:pre-wrap}
@@ -179,7 +180,8 @@ body.noscroll{overflow:hidden}
 <p class="muted">Edit product descriptions and prices for new orders. Previously saved orders keep their original descriptions and unit prices.</p>
 <p class="note">The free merchandise section is listed separately, and stays at $0.00. Free items must be confirmed with the vendor.</p>
 <div id="adminProducts"></div>
-<div class="actions" style="margin-top:14px"><button id="savePrices">Save product changes</button></div>
+<div class="actions" style="margin-top:14px"><button id="savePrices">Save product changes</button><button class="gold" type="button" id="exportCatalog">Export Excel</button><button class="gold" type="button" id="importCatalog">Import Excel</button><input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden"></div>
+<div id="importPreview" class="catalog-add hidden"><h2>Import preview</h2><p id="importSummary"></p><div class="table-wrap"><table class="results" style="min-width:640px"><thead><tr><th>Row</th><th>Item</th><th>Description</th><th>Section</th><th class="num">Price</th><th>Change</th></tr></thead><tbody id="importBody"></tbody></table></div><p class="muted" style="margin-top:10px">Nothing is saved until you click Apply. Products not in the spreadsheet are left as they are; products can't be deleted. Rows with errors are skipped.</p><div class="actions"><button id="importApply">Apply changes</button><button class="secondary" id="importCancel">Cancel</button></div></div>
 <p id="adminMessage" role="status"></p>
 <div class="catalog-add"><h2>Add new product</h2><p class="muted">New items will appear automatically for every employee in the correct order section.</p>
 <form id="addProductForm"><div class="grid">
@@ -743,6 +745,94 @@ async function savePrices(){
  for(const item of changed){delete priceDrafts[item.id];delete nameDrafts[item.id]}
  $('adminMessage').textContent=`Saved ${changed.length} updated product${changed.length===1?'':'s'} to Firebase. New orders will use the updated details.`;
 }
+async function exportCatalog(){
+ if(!isAdmin)throw Error('Administrator permission required.');
+ const list=[...products.filter(p=>p.category!=='free'),...products.filter(p=>p.category==='free')];
+ if(!list.length)throw Error('No products to export.');
+ const rows=list.map(p=>({'Item #':/^\d+$/.test(p.id)?Number(p.id):p.id,'Description':p.name,'Section':p.category==='free'?'Free merchandise':'Purchase items','Unit price':p.category==='free'?0:Number(p.price)}));
+ const name='Community-Coffee-Catalog-'+todayLocal();
+ const unsaved=Object.keys(priceDrafts).length||Object.keys(nameDrafts).length;
+ try{
+  await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
+  const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:10},{wch:40},{wch:18},{wch:11}];
+  for(let i=2;i<=rows.length+1;i++)if(ws['D'+i])ws['D'+i].z='$#,##0.00';
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Catalog');XLSX.writeFile(wb,name+'.xlsx');
+  $('adminMessage').textContent=`Exported ${rows.length} products to Excel.`+(unsaved?' Unsaved edits on this page were not included.':'');
+ }catch(e){
+  console.warn('SheetJS unavailable, exporting CSV',e);
+  const cols=Object.keys(rows[0]),q=v=>{const t=String(v??'');return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+  downloadBlob(new Blob(['\ufeff'+[cols.join(','),...rows.map(r=>cols.map(c=>q(c==='Unit price'?Number(r[c]).toFixed(2):r[c])).join(','))].join('\r\n')],{type:'text/csv'}),name+'.csv');
+  $('adminMessage').textContent=`Excel library unavailable, so ${rows.length} products were exported as a CSV file (opens in Excel).`+(unsaved?' Unsaved edits on this page were not included.':'');
+ }
+}
+/* ---------- catalog import ---------- */
+let importPlan=null;
+function parseCsv(text){const rows=[];let row=[],f='',q=false;for(let i=0;i<text.length;i++){const c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}else if(c==='"')q=true;else if(c===','){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}else f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
+async function readSheetRows(file){
+ if(/\.csv$/i.test(file.name)){const text=(await file.text()).replace(/^﻿/,'');const grid=parseCsv(text).filter(r=>r.some(c=>String(c).trim()));if(!grid.length)return [];const head=grid[0];return grid.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??''])))}
+ try{await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils)}catch(e){throw Error('The Excel reader could not load. Check your internet connection, or save the sheet as CSV and import that.')}
+ const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});const ws=wb.Sheets['Catalog']||wb.Sheets[wb.SheetNames[0]];
+ return XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
+}
+const IMPORT_COLS={id:['item','item#','itemno','itemnumber','itemid','communitycoffeeitemnumber','sku'],name:['description','productdescription','product','productname','name'],category:['section','category','type'],price:['unitprice','price','cost','unitcost']};
+function planImport(rows){
+ if(!rows.length)throw Error('The spreadsheet has no product rows.');
+ const keys=Object.keys(rows[0]),norm=k=>String(k).toLowerCase().replace(/[^a-z0-9#]/g,'');
+ const col={};for(const [f,names] of Object.entries(IMPORT_COLS))col[f]=keys.find(k=>names.includes(norm(k)));
+ if(!col.id)throw Error('Could not find an "Item #" column. Use the same headings as Export Excel: Item #, Description, Section, Unit price.');
+ if(!col.name&&!col.price&&!col.category)throw Error('Could not find Description, Section or Unit price columns.');
+ const byId=new Map(products.map(p=>[p.id,p])),seen=new Set(),out=[];
+ rows.forEach((r,i)=>{
+  const rowNo=i+2,rawId=r[col.id];const id=(typeof rawId==='number'?String(Math.round(rawId)):String(rawId??'').trim()).replace(/\.0+$/,'');
+  const rawName=col.name?String(r[col.name]??'').trim():'',rawCat=col.category?String(r[col.category]??'').trim().toLowerCase():'',rawPrice=col.price?r[col.price]:'';
+  if(!id&&!rawName&&String(rawPrice).trim()==='')return; // blank row
+  const err=m=>out.push({rowNo,id,name:rawName,kind:'error',msg:m});
+  if(!/^[A-Za-z0-9_-]{1,64}$/.test(id))return err('Item # must be letters, numbers, - or _');
+  if(seen.has(id))return err('Item # appears more than once in the sheet');seen.add(id);
+  const cur=byId.get(id);
+  const name=rawName||cur?.name||'';
+  if(!name)return err('Description is required for a new item');if(name.length>140)return err('Description is over 140 characters');
+  let category=cur?.category||'paid';
+  if(rawCat){if(rawCat.includes('free'))category='free';else if(/purchase|paid|buy/.test(rawCat))category='paid';else return err('Section must be "Purchase items" or "Free merchandise"')}
+  let price;const ps=typeof rawPrice==='number'?String(rawPrice):String(rawPrice??'').replace(/[$,\s]/g,'');
+  if(ps===''){if(category==='free')price=0;else if(cur)price=cur.price;else return err('Unit price is required for a new purchase item')}
+  else{price=Number(ps);if(!Number.isFinite(price)||price<0||price>9999999)return err('Unit price is not a valid amount');if(Math.abs(price*100-Math.round(price*100))>1e-6)return err('Unit price has more than 2 decimals');price=Math.round(price*100)/100}
+  if(category==='free'&&price!==0)return err('Free merchandise must be $0.00');
+  if(!cur)return out.push({rowNo,id,name,category,price,kind:'new',msg:'New product'});
+  const ch=[];
+  if(name!==cur.name)ch.push(`Name: "${cur.name}" → "${name}"`);
+  if(category!==cur.category)ch.push(`Section: ${cur.category==='free'?'Free':'Purchase'} → ${category==='free'?'Free':'Purchase'}`);
+  if(Math.round(price*100)!==Math.round(Number(cur.price)*100))ch.push(`Price: ${money(cur.price)} → ${money(price)}`);
+  out.push({rowNo,id,name,category,price,kind:ch.length?'change':'same',msg:ch.join('; ')||'No change'});
+ });
+ return out;
+}
+function showImportPreview(plan){
+ importPlan=plan;
+ const n=k=>plan.filter(p=>p.kind===k).length,changes=n('new')+n('change');
+ $('importSummary').innerHTML=`<b>${n('new')}</b> new · <b>${n('change')}</b> updated · ${n('same')} unchanged`+(n('error')?` · <span class="error" style="font-weight:700">${n('error')} with errors (will be skipped)</span>`:'');
+ const order={error:0,change:1,new:2};
+ const show=plan.filter(p=>p.kind!=='same').sort((a,b)=>order[a.kind]-order[b.kind]||a.rowNo-b.rowNo);
+ $('importBody').innerHTML=show.length?show.map(p=>`<tr class="${p.kind==='new'?'imp-new':p.kind==='change'?'imp-chg':'imp-err'}"><td>${p.rowNo}</td><td>${esc(p.id)}</td><td>${esc(p.name)}</td><td>${p.kind==='error'?'':p.category==='free'?'Free':'Purchase'}</td><td class="num">${p.kind==='error'?'':money(p.price)}</td><td>${esc(p.msg)}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">Everything in the sheet already matches the current list.</td></tr>';
+ $('importApply').disabled=!changes;$('importApply').textContent=changes?`Apply ${changes} change${changes===1?'':'s'}`:'Nothing to apply';
+ $('importPreview').classList.remove('hidden');$('importPreview').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function importFile(file){
+ if(!isAdmin)throw Error('Administrator permission required.');
+ if(!catalogLoaded)throw Error('Catalog is still loading. Please try again.');
+ $('adminMessage').textContent='Reading '+file.name+'…';
+ const plan=planImport(await readSheetRows(file));
+ $('adminMessage').textContent='';showImportPreview(plan);
+}
+async function applyImport(){
+ if(!isAdmin)throw Error('Administrator permission required.');
+ const items=(importPlan||[]).filter(p=>p.kind==='new'||p.kind==='change');if(!items.length)return;
+ for(let i=0;i<items.length;i+=400){const batch=writeBatch(db);for(const p of items.slice(i,i+400))batch.set(doc(db,'catalog',p.id),{id:p.id,name:p.name,category:p.category,price:p.category==='free'?0:p.price,updatedBy:currentUser.uid,updatedAt:serverTimestamp()},{merge:true});await batch.commit()}
+ const added=items.filter(p=>p.kind==='new').length,upd=items.length-added;
+ for(const p of items){delete priceDrafts[p.id];delete nameDrafts[p.id]}
+ importPlan=null;$('importPreview').classList.add('hidden');
+ $('adminMessage').textContent=`Import complete: ${added} added, ${upd} updated. New orders use the updated list; past POs keep their prices.`;
+}
 async function saveVendor(){
  if(!isAdmin)throw Error('Administrator permission required.');
  const list=parseRecipients($('vendorEmail').value);
@@ -761,6 +851,11 @@ $('newTab').onclick=()=>tab('new');$('historyTab').onclick=()=>tab('history');$(
 $('newItemCategory').onchange=()=>{const free=$('newItemCategory').value==='free';if(free)$('newItemPrice').value='0.00';$('newItemPrice').disabled=free};
 $('addProductForm').onsubmit=e=>{e.preventDefault();guard($('addProduct'),addProduct,err=>$('addProductMessage').textContent=err.message)()};
 $('savePrices').onclick=guard($('savePrices'),async()=>{$('adminMessage').textContent='Saving product changes…';await savePrices()},e=>$('adminMessage').textContent='Product save failed: '+e.message);
+$('exportCatalog').onclick=guard($('exportCatalog'),exportCatalog,e=>$('adminMessage').textContent='Export failed: '+e.message);
+$('importCatalog').onclick=()=>{$('importFile').value='';$('importFile').click()};
+$('importFile').onchange=guard($('importCatalog'),async()=>{const f=$('importFile').files[0];if(f)await importFile(f)},e=>{$('adminMessage').textContent='Import failed: '+e.message;$('importPreview').classList.add('hidden')});
+$('importApply').onclick=guard($('importApply'),applyImport,e=>$('adminMessage').textContent='Import failed: '+friendly(e));
+$('importCancel').onclick=()=>{importPlan=null;$('importPreview').classList.add('hidden');$('adminMessage').textContent='Import cancelled. Nothing was changed.'};
 $('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').textContent='Save failed: '+e.message);
 $('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
 $('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
