@@ -29,7 +29,7 @@ button.gold{background:#ffd200;color:#00382a}
 button:disabled{opacity:.5;cursor:not-allowed}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.item{display:grid;grid-template-columns:1fr 94px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #e4ebe7}
+.item{display:grid;grid-template-columns:56px 1fr 94px;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #e4ebe7}
 .item small{color:#64766c;display:block;margin-top:3px}
 .item input{text-align:center;font-size:1.1rem;font-weight:700}
 .muted{color:#64766c;font-size:.9rem}
@@ -51,11 +51,18 @@ details.group[open]>summary span:first-child::before{transform:rotate(90deg)}
 details.group>.inner{padding:0 14px 6px}
 details.year{background:#f1f8f3;border-color:#c8dbcf}
 details.year>.inner details.group{background:#fff}
-.admin-row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e4ebe7}
-.admin-row small{display:block;color:#64766c}.admin-row input{text-align:right}
+.admin-row{display:grid;grid-template-columns:84px 1fr 110px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e4ebe7}
+.admin-row small{display:block;color:#64766c}.admin-row input[type=number]{text-align:right}
 .catalog-add{border:1px solid #c8dbcf;border-radius:12px;padding:14px;margin-top:20px;background:#f6faf7}
 .catalog-add .grid{margin-bottom:8px}
 .imp-new td{background:#eef9f1}.imp-chg td{background:#fffbe6}.imp-err td{background:#fde8e6;color:#8a322d}
+.thumb{width:56px;height:56px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #dbe5df;display:flex;align-items:center;justify-content:center}
+img.thumb{cursor:zoom-in}.thumb.noimg{background:#f1f5f3;color:#9aaba2;font-size:.68rem;font-weight:700}
+.thumb.big{width:84px;height:84px}.photo-cell{display:flex;flex-direction:column;gap:4px;align-items:center}.photo-cell button{padding:4px 8px;font-size:.74rem;width:84px}
+.imp-thumb{width:40px;height:40px;object-fit:contain;border:1px solid #dbe5df;border-radius:6px;background:#fff}
+#imgZoom{position:fixed;inset:0;background:#0b1f18cc;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+#imgZoom img{max-width:94vw;max-height:80vh;min-width:min(320px,90vw);object-fit:contain;background:#fff;border-radius:12px;padding:10px;box-shadow:0 10px 40px #0007}#imgZoom p{color:#fff;font-weight:700;margin:12px 0 0;text-align:center;font-size:1.05rem}#imgZoom small{color:#d6e6dd;margin-top:4px;min-height:1em;text-align:center}
+#imgZoomClose{position:fixed;top:14px;right:14px;width:46px;height:46px;border-radius:50%;padding:0;font-size:1.3rem;background:#fff;color:#00543b;box-shadow:0 4px 14px #0005}
 .note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}
 .lock-banner{background:#fff1e0;border-left:4px solid #c77700;padding:11px 12px;border-radius:6px;margin-bottom:14px;font-size:.9rem;font-weight:600}
 .error{color:#a12525;white-space:pre-wrap}
@@ -88,7 +95,7 @@ table.results tfoot td{font-weight:800;background:#f1f8f3}
 .modal iframe{flex:1;border:0;width:100%;background:#525659}
 body.noscroll{overflow:hidden}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(620px,92vw);background:#00382a;color:#fff;padding:13px 16px;border-radius:10px;box-shadow:0 6px 24px #0005;z-index:60;font-size:.9rem;cursor:pointer}
-@media(max-width:620px){.grid,.grid3{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:1fr 80px}.admin-row{grid-template-columns:1fr 95px}.recv-row{grid-template-columns:1fr 90px}}
+@media(max-width:620px){.grid,.grid3{grid-template-columns:1fr}.tiles{grid-template-columns:1fr 1fr}header img{height:65px}.wrap{padding:10px}.panel{padding:14px}.item{grid-template-columns:48px 1fr 76px}.item .thumb{width:48px;height:48px}.admin-row{grid-template-columns:70px 1fr 90px}.thumb.big{width:70px;height:70px}.photo-cell button{width:70px}.recv-row{grid-template-columns:1fr 90px}}
 </style>
 </head>
 <body>
@@ -181,7 +188,7 @@ body.noscroll{overflow:hidden}
 <p class="note">The free merchandise section is listed separately, and stays at $0.00. Free items must be confirmed with the vendor.</p>
 <div id="adminProducts"></div>
 <div class="actions" style="margin-top:14px"><button id="savePrices">Save product changes</button><button class="gold" type="button" id="exportCatalog">Export Excel</button><button class="gold" type="button" id="importCatalog">Import Excel</button><input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden"></div>
-<div id="importPreview" class="catalog-add hidden"><h2>Import preview</h2><p id="importSummary"></p><div class="table-wrap"><table class="results" style="min-width:640px"><thead><tr><th>Row</th><th>Item</th><th>Description</th><th>Section</th><th class="num">Price</th><th>Change</th></tr></thead><tbody id="importBody"></tbody></table></div><p class="muted" style="margin-top:10px">Nothing is saved until you click Apply. Products not in the spreadsheet are left as they are; products can't be deleted. Rows with errors are skipped.</p><div class="actions"><button id="importApply">Apply changes</button><button class="secondary" id="importCancel">Cancel</button></div></div>
+<div id="importPreview" class="catalog-add hidden"><h2>Import preview</h2><p id="importSummary"></p><div class="table-wrap"><table class="results" style="min-width:640px"><thead><tr><th>Row</th><th>Photo</th><th>Item</th><th>Description</th><th>Section</th><th class="num">Price</th><th>Change</th></tr></thead><tbody id="importBody"></tbody></table></div><p class="muted" style="margin-top:10px">Nothing is saved until you click Apply. Products not in the spreadsheet are left as they are; products can't be deleted. Rows with errors are skipped.</p><div class="actions"><button id="importApply">Apply changes</button><button class="secondary" id="importCancel">Cancel</button></div></div>
 <p id="adminMessage" role="status"></p>
 <div class="catalog-add"><h2>Add new product</h2><p class="muted">New items will appear automatically for every employee in the correct order section.</p>
 <form id="addProductForm"><div class="grid">
@@ -196,6 +203,8 @@ body.noscroll{overflow:hidden}
 </section>
 </div>
 </main>
+<div id="imgZoom" class="hidden" role="dialog" aria-label="Product photo"><button type="button" id="imgZoomClose" aria-label="Close photo">✕</button><img id="imgZoomPic" alt=""><p id="imgZoomCap"></p><small id="imgZoomNote"></small></div>
+<input type="file" id="photoFile" accept="image/*" class="hidden">
 <div id="toast" class="toast hidden" role="status" onclick="this.classList.add('hidden')"></div>
 <div id="pdfModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfTitle"><div class="modal-box"><div class="modal-bar"><b id="pdfTitle">PDF preview</b><div class="actions"><button class="gold hidden" id="pdfEmail">Email PDF</button><button id="pdfDownload">Download</button><button class="secondary" id="pdfOpen">Open in new tab</button><button class="secondary" id="pdfClose">Close</button></div></div><iframe id="pdfFrame" title="PDF preview"></iframe></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
@@ -249,7 +258,7 @@ function renderProducts(qtyOverride){
  const quantities=qtyOverride??Object.fromEntries([...document.querySelectorAll('[data-id]')].map(e=>[e.dataset.id,e.value]));
  const locked=!!lockedOrder,list=displayProducts();
  for(const cat of ['paid','free']){
-  const rows=list.filter(x=>x.category===cat).map(x=>{const q=quantities[x.id]??'0';return `<div class="item${locked&&!(Number(q)>0)?' hidden':''}"><div><b>${esc(x.name)}</b><small>Item ${esc(x.id)} · ${cat==='free'?'FREE':money(x.price)+' / unit'}</small></div><input type="number" inputmode="numeric" min="0" step="1" value="${esc(q)}" data-id="${esc(x.id)}" aria-label="Quantity for ${esc(x.name)}"${locked?' disabled':''}></div>`});
+  const rows=list.filter(x=>x.category===cat).map(x=>{const q=quantities[x.id]??'0';return `<div class="item${locked&&!(Number(q)>0)?' hidden':''}">${thumbHtml(x)}<div><b>${esc(x.name)}</b><small>Item ${esc(x.id)} · ${cat==='free'?'FREE':money(x.price)+' / unit'}</small></div><input type="number" inputmode="numeric" min="0" step="1" value="${esc(q)}" data-id="${esc(x.id)}" aria-label="Quantity for ${esc(x.name)}"${locked?' disabled':''}></div>`});
   const anyShown=list.some(x=>x.category===cat&&(!locked||Number(quantities[x.id])>0));
   $(cat==='paid'?'items':'freeItems').innerHTML=rows.join('')+(locked&&!anyShown?'<p class="muted">None on this order.</p>':'');
  }
@@ -703,7 +712,7 @@ async function exportSearchPdf(){
 /* ---------- admin ---------- */
 function renderAdmin(){
  if(!isAdmin)return;
- $('adminProducts').innerHTML=products.map(x=>`<div class="admin-row"><div><label for="name-${esc(x.id)}">Product name · Item ${esc(x.id)}</label><input id="name-${esc(x.id)}" type="text" maxlength="140" value="${esc(Object.prototype.hasOwnProperty.call(nameDrafts,x.id)?nameDrafts[x.id]:x.name)}"><small>${x.category==='free'?'Free merchandise':'Paid merchandise'} · Item number cannot be changed</small></div><div><label for="price-${esc(x.id)}">Unit price</label><input id="price-${esc(x.id)}" type="number" min="0" max="9999999" step="0.01" inputmode="decimal" value="${esc(Object.prototype.hasOwnProperty.call(priceDrafts,x.id)?priceDrafts[x.id]:Number(x.price).toFixed(2))}" ${x.category==='free'?'disabled':''}></div></div>`).join('');
+ $('adminProducts').innerHTML=products.map(x=>`<div class="admin-row"><div class="photo-cell">${thumbHtml(x,'thumb big')}<button type="button" class="secondary" data-photo="${esc(x.id)}">${x.image?'Change photo':'Add photo'}</button>${x.image?`<button type="button" class="secondary" data-photo-remove="${esc(x.id)}">Remove</button>`:''}</div><div><label for="name-${esc(x.id)}">Product name · Item ${esc(x.id)}</label><input id="name-${esc(x.id)}" type="text" maxlength="140" value="${esc(Object.prototype.hasOwnProperty.call(nameDrafts,x.id)?nameDrafts[x.id]:x.name)}"><small>${x.category==='free'?'Free merchandise':'Paid merchandise'} · Item number cannot be changed</small></div><div><label for="price-${esc(x.id)}">Unit price</label><input id="price-${esc(x.id)}" type="number" min="0" max="9999999" step="0.01" inputmode="decimal" value="${esc(Object.prototype.hasOwnProperty.call(priceDrafts,x.id)?priceDrafts[x.id]:Number(x.price).toFixed(2))}" ${x.category==='free'?'disabled':''}></div></div>`).join('');
  for(const x of products){
   $('name-'+x.id).addEventListener('input',e=>{nameDrafts[x.id]=e.target.value;$('adminMessage').textContent='Unsaved product changes. Click Save product changes to apply.'});
   if(x.category!=='free')$('price-'+x.id).addEventListener('input',e=>{priceDrafts[x.id]=e.target.value;$('adminMessage').textContent='Unsaved product changes. Click Save product changes to apply.'});
@@ -766,7 +775,7 @@ async function exportCatalog(){
  }
 }
 /* ---------- catalog import ---------- */
-let importPlan=null;
+let importPlan=null,importLarges=new Map();
 function parseCsv(text){const rows=[];let row=[],f='',q=false;for(let i=0;i<text.length;i++){const c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}else if(c==='"')q=true;else if(c===','){row.push(f);f=''}else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}else f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
 async function readSheetRows(file){
  if(/\.csv$/i.test(file.name)){const text=(await file.text()).replace(/^﻿/,'');const grid=parseCsv(text).filter(r=>r.some(c=>String(c).trim()));if(!grid.length)return [];const head=grid[0];return grid.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??''])))}
@@ -775,7 +784,7 @@ async function readSheetRows(file){
  return XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});
 }
 const IMPORT_COLS={id:['item','item#','itemno','itemnumber','itemid','communitycoffeeitemnumber','sku'],name:['description','productdescription','product','productname','name'],category:['section','category','type'],price:['unitprice','price','cost','unitcost']};
-function planImport(rows){
+function planImport(rows,thumbs=new Map()){
  if(!rows.length)throw Error('The spreadsheet has no product rows.');
  const keys=Object.keys(rows[0]),norm=k=>String(k).toLowerCase().replace(/[^a-z0-9#]/g,'');
  const col={};for(const [f,names] of Object.entries(IMPORT_COLS))col[f]=keys.find(k=>names.includes(norm(k)));
@@ -783,7 +792,7 @@ function planImport(rows){
  if(!col.name&&!col.price&&!col.category)throw Error('Could not find Description, Section or Unit price columns.');
  const byId=new Map(products.map(p=>[p.id,p])),seen=new Set(),out=[];
  rows.forEach((r,i)=>{
-  const rowNo=i+2,rawId=r[col.id];const id=(typeof rawId==='number'?String(Math.round(rawId)):String(rawId??'').trim()).replace(/\.0+$/,'');
+  const rowNo=Number.isInteger(r.__rowNum__)?r.__rowNum__+1:i+2,rawId=r[col.id];const image=thumbs.get(rowNo)||'';const id=(typeof rawId==='number'?String(Math.round(rawId)):String(rawId??'').trim()).replace(/\.0+$/,'');
   const rawName=col.name?String(r[col.name]??'').trim():'',rawCat=col.category?String(r[col.category]??'').trim().toLowerCase():'',rawPrice=col.price?r[col.price]:'';
   if(!id&&!rawName&&String(rawPrice).trim()==='')return; // blank row
   const err=m=>out.push({rowNo,id,name:rawName,kind:'error',msg:m});
@@ -798,22 +807,23 @@ function planImport(rows){
   if(ps===''){if(category==='free')price=0;else if(cur)price=cur.price;else return err('Unit price is required for a new purchase item')}
   else{price=Number(ps);if(!Number.isFinite(price)||price<0||price>9999999)return err('Unit price is not a valid amount');if(Math.abs(price*100-Math.round(price*100))>1e-6)return err('Unit price has more than 2 decimals');price=Math.round(price*100)/100}
   if(category==='free'&&price!==0)return err('Free merchandise must be $0.00');
-  if(!cur)return out.push({rowNo,id,name,category,price,kind:'new',msg:'New product'});
+  if(!cur)return out.push({rowNo,id,name,category,price,image,kind:'new',msg:'New product'+(image?' (with photo)':'')});
   const ch=[];
   if(name!==cur.name)ch.push(`Name: "${cur.name}" → "${name}"`);
   if(category!==cur.category)ch.push(`Section: ${cur.category==='free'?'Free':'Purchase'} → ${category==='free'?'Free':'Purchase'}`);
   if(Math.round(price*100)!==Math.round(Number(cur.price)*100))ch.push(`Price: ${money(cur.price)} → ${money(price)}`);
-  out.push({rowNo,id,name,category,price,kind:ch.length?'change':'same',msg:ch.join('; ')||'No change'});
+  if(image&&image!==cur.image)ch.push(cur.image?'Photo replaced':'Photo added');
+  out.push({rowNo,id,name,category,price,image,kind:ch.length?'change':'same',msg:ch.join('; ')||'No change'});
  });
  return out;
 }
 function showImportPreview(plan){
  importPlan=plan;
  const n=k=>plan.filter(p=>p.kind===k).length,changes=n('new')+n('change');
- $('importSummary').innerHTML=`<b>${n('new')}</b> new · <b>${n('change')}</b> updated · ${n('same')} unchanged`+(n('error')?` · <span class="error" style="font-weight:700">${n('error')} with errors (will be skipped)</span>`:'');
+ $('importSummary').innerHTML=`<b>${n('new')}</b> new · <b>${n('change')}</b> updated · ${n('same')} unchanged`+(n('error')?` · <span class="error" style="font-weight:700">${n('error')} with errors (will be skipped)</span>`:'')+(plan.some(p=>p.image)?` · ${plan.filter(p=>p.image).length} photo${plan.filter(p=>p.image).length===1?'':'s'} found`:'');
  const order={error:0,change:1,new:2};
  const show=plan.filter(p=>p.kind!=='same').sort((a,b)=>order[a.kind]-order[b.kind]||a.rowNo-b.rowNo);
- $('importBody').innerHTML=show.length?show.map(p=>`<tr class="${p.kind==='new'?'imp-new':p.kind==='change'?'imp-chg':'imp-err'}"><td>${p.rowNo}</td><td>${esc(p.id)}</td><td>${esc(p.name)}</td><td>${p.kind==='error'?'':p.category==='free'?'Free':'Purchase'}</td><td class="num">${p.kind==='error'?'':money(p.price)}</td><td>${esc(p.msg)}</td></tr>`).join(''):'<tr><td colspan="6" class="muted">Everything in the sheet already matches the current list.</td></tr>';
+ $('importBody').innerHTML=show.length?show.map(p=>`<tr class="${p.kind==='new'?'imp-new':p.kind==='change'?'imp-chg':'imp-err'}"><td>${p.rowNo}</td><td>${p.image?`<img class="imp-thumb" src="${esc(p.image)}" alt="">`:''}</td><td>${esc(p.id)}</td><td>${esc(p.name)}</td><td>${p.kind==='error'?'':p.category==='free'?'Free':'Purchase'}</td><td class="num">${p.kind==='error'?'':money(p.price)}</td><td>${esc(p.msg)}</td></tr>`).join(''):'<tr><td colspan="7" class="muted">Everything in the sheet already matches the current list.</td></tr>';
  $('importApply').disabled=!changes;$('importApply').textContent=changes?`Apply ${changes} change${changes===1?'':'s'}`:'Nothing to apply';
  $('importPreview').classList.remove('hidden');$('importPreview').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -821,17 +831,100 @@ async function importFile(file){
  if(!isAdmin)throw Error('Administrator permission required.');
  if(!catalogLoaded)throw Error('Catalog is still loading. Please try again.');
  $('adminMessage').textContent='Reading '+file.name+'…';
- const plan=planImport(await readSheetRows(file));
+ const rows=await readSheetRows(file);
+ const pics=await excelImagesByRow(file).catch(e=>{console.warn('Could not read pictures',e);return new Map()});
+ const thumbs=new Map(),larges=new Map();for(const [row,blob] of pics){try{const ps=await photoSet(blob);thumbs.set(row,ps.thumb);larges.set(row,ps.large)}catch(e){console.warn('Skipping unreadable picture on row '+row,e)}}
+ importLarges=larges;
+ const plan=planImport(rows,thumbs);
  $('adminMessage').textContent='';showImportPreview(plan);
 }
 async function applyImport(){
  if(!isAdmin)throw Error('Administrator permission required.');
  const items=(importPlan||[]).filter(p=>p.kind==='new'||p.kind==='change');if(!items.length)return;
- for(let i=0;i<items.length;i+=400){const batch=writeBatch(db);for(const p of items.slice(i,i+400))batch.set(doc(db,'catalog',p.id),{id:p.id,name:p.name,category:p.category,price:p.category==='free'?0:p.price,updatedBy:currentUser.uid,updatedAt:serverTimestamp()},{merge:true});await batch.commit()}
+ for(let i=0;i<items.length;i+=400){const batch=writeBatch(db);for(const p of items.slice(i,i+400))batch.set(doc(db,'catalog',p.id),{id:p.id,name:p.name,category:p.category,price:p.category==='free'?0:p.price,...(p.image?{image:p.image}:{}),updatedBy:currentUser.uid,updatedAt:serverTimestamp()},{merge:true});await batch.commit()}
+ let photoNote='';const withPhoto=items.filter(p=>p.image&&importLarges.get(p.rowNo));
+ try{for(let i=0;i<withPhoto.length;i+=200){const batch=writeBatch(db);for(const p of withPhoto.slice(i,i+200)){batch.set(doc(db,'catalogPhotos',p.id),{image:importLarges.get(p.rowNo),updatedBy:currentUser.uid,updatedAt:serverTimestamp()});fullPhotoCache.set(p.id,importLarges.get(p.rowNo))}await batch.commit()}}
+ catch(e){console.warn('Full-size photos not saved',e);photoNote=' Full-size photos could not be saved: publish the latest firestore.rules in Firebase so photos open sharp.'}
  const added=items.filter(p=>p.kind==='new').length,upd=items.length-added;
  for(const p of items){delete priceDrafts[p.id];delete nameDrafts[p.id]}
  importPlan=null;$('importPreview').classList.add('hidden');
- $('adminMessage').textContent=`Import complete: ${added} added, ${upd} updated. New orders use the updated list; past POs keep their prices.`;
+ $('adminMessage').textContent=`Import complete: ${added} added, ${upd} updated. New orders use the updated list; past POs keep their prices.`+photoNote;importLarges=new Map();
+}
+/* ---------- product photos ---------- */
+// Photos are shrunk to a small JPEG and stored on the catalog item, so every device sees them.
+async function toThumb(blob,max=360,cap=110000){
+ const url=URL.createObjectURL(blob);
+ try{
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(Error('That file is not a picture this browser can read (use JPG or PNG).'));i.src=url});
+  const sc=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*sc));c.height=Math.max(1,Math.round(img.naturalHeight*sc));
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);
+  let q=.85,d=c.toDataURL('image/jpeg',q);while(d.length>cap&&q>.35){q-=.1;d=c.toDataURL('image/jpeg',q)}
+  return d;
+ }finally{URL.revokeObjectURL(url)}
+}
+const thumbHtml=(x,cls='thumb')=>x.image?`<img class="${cls}" src="${esc(x.image)}" alt="${esc(x.name)}" data-zoom="${esc(x.id)}" loading="lazy">`:`<span class="${cls} noimg" aria-hidden="true">${esc(String(x.id).slice(-5))}</span>`;
+const fullPhotoCache=new Map();
+async function photoSet(blob){const [thumb,large]=await Promise.all([toThumb(blob,300,90000),toThumb(blob,1400,650000)]);return {thumb,large}}
+async function zoomImage(id){
+ const x=products.find(p=>p.id===id);if(!x?.image)return;
+ const pic=$('imgZoomPic');pic.src=fullPhotoCache.get(id)||x.image;$('imgZoomCap').textContent=`${x.id} · ${x.name}${x.category==='free'?' · FREE':' · '+money(x.price)}`;
+ $('imgZoom').classList.remove('hidden');document.body.classList.add('noscroll');
+ if(fullPhotoCache.has(id)){$('imgZoomNote').textContent='';return}
+ $('imgZoomNote').textContent='Loading full size…';
+ try{const snap=await getDoc(doc(db,'catalogPhotos',id));const big=snap.exists()?snap.data().image:'';if(big){fullPhotoCache.set(id,big);if($('imgZoomCap').textContent.startsWith(x.id+' '))pic.src=big;$('imgZoomNote').textContent=''}else $('imgZoomNote').textContent='Only a small copy of this photo is saved. Re-add the photo to see it sharper.'}
+ catch(e){console.warn('Full-size photo unavailable',e);$('imgZoomNote').textContent=''}
+}
+function closeZoom(){$('imgZoom').classList.add('hidden');if($('pdfModal').classList.contains('hidden'))document.body.classList.remove('noscroll')}
+// Returns '' when everything saved, or a note if only the small copy could be saved.
+async function savePhoto(id,set){
+ if(!isAdmin)throw Error('Administrator permission required.');
+ const x=products.find(p=>p.id===id);if(!x)throw Error('Product not found.');
+ await setDoc(doc(db,'catalog',id),{id,name:x.name,category:x.category,price:x.category==='free'?0:Number(x.price),image:set?.thumb||'',updatedBy:currentUser.uid,updatedAt:serverTimestamp()},{merge:true});
+ fullPhotoCache.delete(id);
+ try{await setDoc(doc(db,'catalogPhotos',id),{image:set?.large||'',updatedBy:currentUser.uid,updatedAt:serverTimestamp()});if(set?.large)fullPhotoCache.set(id,set.large);return ''}
+ catch(e){console.warn('Full-size photo not saved',e);return set?' The full-size copy could not be saved: publish the latest firestore.rules in Firebase so photos open sharp.':''}
+}
+let photoTarget=null;
+// Reads pictures out of an .xlsx file: pictures placed in a cell, and pictures floating over a row.
+async function excelImagesByRow(file){
+ const out=new Map();
+ if(!/\.xlsx$/i.test(file.name))return out;
+ try{await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',()=>!!window.JSZip)}catch(e){console.warn('JSZip unavailable; skipping pictures',e);return out}
+ const R='http://schemas.openxmlformats.org/officeDocument/2006/relationships',XDR='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing',A='http://schemas.openxmlformats.org/drawingml/2006/main';
+ const zip=await JSZip.loadAsync(await file.arrayBuffer());
+ const read=async path=>{const f=zip.file(path);return f?f.async('string'):null};
+ const xml=t=>new DOMParser().parseFromString(t,'application/xml');
+ const resolve=(base,target)=>{if(target.startsWith('/'))return target.slice(1);const parts=base.split('/');parts.pop();for(const seg of target.split('/')){if(seg==='..')parts.pop();else if(seg&&seg!=='.')parts.push(seg)}return parts.join('/')};
+ const rels=async path=>{const i=path.lastIndexOf('/');const t=await read(`${path.slice(0,i)}/_rels/${path.slice(i+1)}.rels`);const m={};if(t)for(const r of xml(t).getElementsByTagName('Relationship'))m[r.getAttribute('Id')]=resolve(path,r.getAttribute('Target'));return m};
+ const blobOf=async path=>{const f=zip.file(path);if(!f)return null;const type={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',bmp:'image/bmp',webp:'image/webp'}[path.split('.').pop().toLowerCase()];return type?new Blob([await f.async('uint8array')],{type}):null};
+ const wbXml=await read('xl/workbook.xml');if(!wbXml)return out;
+ const sheets=[...xml(wbXml).getElementsByTagName('sheet')];const sh=sheets.find(x=>x.getAttribute('name')==='Catalog')||sheets[0];if(!sh)return out;
+ const sheetPath=(await rels('xl/workbook.xml'))[sh.getAttributeNS(R,'id')||sh.getAttribute('r:id')];if(!sheetPath)return out;
+ const sheetXml=await read(sheetPath);if(!sheetXml)return out;const sx=xml(sheetXml);const sRels=await rels(sheetPath);
+ // 1) pictures placed in a cell (Excel "Place in Cell")
+ const cells=[...sx.getElementsByTagName('c')].filter(c=>c.getAttribute('vm'));
+ if(cells.length){
+  const rvT=await read('xl/richData/rdrichvalue.xml'),relT=await read('xl/richData/richValueRel.xml');
+  if(rvT&&relT){
+   const rv=[...xml(rvT).getElementsByTagName('rv')].map(r=>[...r.getElementsByTagName('v')].map(v=>v.textContent));
+   const relIds=[...xml(relT).getElementsByTagName('rel')].map(r=>r.getAttributeNS(R,'id')||r.getAttribute('r:id'));
+   const rr=await rels('xl/richData/richValueRel.xml');
+   let vmToRv=vm=>vm-1;const mT=await read('xl/metadata.xml');
+   if(mT){const m=xml(mT);const fm=[...m.getElementsByTagName('futureMetadata')].find(f=>f.getAttribute('name')==='XLRICHVALUE');const rvb=fm?[...fm.getElementsByTagName('bk')].map(bk=>Number(bk.getElementsByTagNameNS('*','rvb')[0]?.getAttribute('i'))):[];const vbk=[...(m.getElementsByTagName('valueMetadata')[0]?.getElementsByTagName('bk')||[])].map(bk=>Number(bk.getElementsByTagName('rc')[0]?.getAttribute('v')));vmToRv=vm=>{const v=vbk[vm-1];return Number.isFinite(v)&&Number.isFinite(rvb[v])?rvb[v]:vm-1}}
+   for(const c of cells){const row=Number(String(c.getAttribute('r')).replace(/^[A-Z]+/i,''));const idx=vmToRv(Number(c.getAttribute('vm')));const media=rr[relIds[Number(rv[idx]?.[0])]];if(media&&row&&!out.has(row)){const b=await blobOf(media);if(b)out.set(row,b)}}
+  }
+ }
+ // 2) pictures floating over the sheet: use the row where the picture's top-left corner sits
+ for(const dEl of sx.getElementsByTagName('drawing')){
+  const dPath=sRels[dEl.getAttributeNS(R,'id')||dEl.getAttribute('r:id')];if(!dPath)continue;const dT=await read(dPath);if(!dT)continue;
+  const dx=xml(dT),dRels=await rels(dPath);
+  for(const anchor of [...dx.getElementsByTagNameNS(XDR,'twoCellAnchor'),...dx.getElementsByTagNameNS(XDR,'oneCellAnchor')]){
+   const from=anchor.getElementsByTagNameNS(XDR,'from')[0];const row=Number(from?.getElementsByTagNameNS(XDR,'row')[0]?.textContent)+1;
+   const blip=anchor.getElementsByTagNameNS(A,'blip')[0];const media=dRels[blip?.getAttributeNS(R,'embed')];
+   if(media&&Number.isFinite(row)&&!out.has(row)){const b=await blobOf(media);if(b)out.set(row,b)}
+  }
+ }
+ return out;
 }
 async function saveVendor(){
  if(!isAdmin)throw Error('Administrator permission required.');
@@ -856,6 +949,11 @@ $('importCatalog').onclick=()=>{$('importFile').value='';$('importFile').click()
 $('importFile').onchange=guard($('importCatalog'),async()=>{const f=$('importFile').files[0];if(f)await importFile(f)},e=>{$('adminMessage').textContent='Import failed: '+e.message;$('importPreview').classList.add('hidden')});
 $('importApply').onclick=guard($('importApply'),applyImport,e=>$('adminMessage').textContent='Import failed: '+friendly(e));
 $('importCancel').onclick=()=>{importPlan=null;$('importPreview').classList.add('hidden');$('adminMessage').textContent='Import cancelled. Nothing was changed.'};
+document.addEventListener('click',e=>{const z=e.target.closest('[data-zoom]');if(z&&z.tagName==='IMG'){e.preventDefault();zoomImage(z.dataset.zoom);return}
+ const add=e.target.closest('[data-photo]');if(add){photoTarget=add.dataset.photo;$('photoFile').value='';$('photoFile').click();return}
+ const rm=e.target.closest('[data-photo-remove]');if(rm){const id=rm.dataset.photoRemove;if(!confirm('Remove the photo for item '+id+'?'))return;savePhoto(id,null).then(()=>$('adminMessage').textContent='Photo removed for item '+id+'.').catch(err=>$('adminMessage').textContent='Could not remove photo: '+friendly(err))}});
+$('imgZoom').onclick=closeZoom;
+$('photoFile').onchange=async()=>{const f=$('photoFile').files[0],id=photoTarget;if(!f||!id)return;$('adminMessage').textContent='Saving photo for item '+id+'…';try{const note=await savePhoto(id,await photoSet(f));$('adminMessage').textContent='Photo saved for item '+id+'. It now shows on the order form.'+note}catch(err){$('adminMessage').textContent='Could not save photo: '+friendly(err)}finally{photoTarget=null}};
 $('saveVendor').onclick=guard($('saveVendor'),saveVendor,e=>$('vendorMessage').textContent='Save failed: '+e.message);
 $('clearOrder').onclick=()=>{lastSavedOrder=null;updateMarkSent();clear()};
 $('historySearch').oninput=renderHistory;$('historyStatus').onchange=renderHistory;
@@ -868,7 +966,7 @@ $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Recei
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
 $('pdfClose').onclick=closePdf;$('pdfEmail').onclick=guard($('pdfEmail'),async()=>{if(!pdfOrder||!pdfDoc)return;const o=pdfOrder,res=await sendEmail(o,{d:pdfDoc,filename:pdfName});closePdf();toast(emailResultMsg(o,res,false))},e=>alert(friendly(e)));$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
-$('pdfModal').addEventListener('click',e=>{if(e.target===$('pdfModal'))closePdf()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('pdfModal').classList.contains('hidden'))closePdf()});
+$('pdfModal').addEventListener('click',e=>{if(e.target===$('pdfModal'))closePdf()});document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('imgZoom').classList.contains('hidden')){closeZoom();return}if(!$('pdfModal').classList.contains('hidden'))closePdf()});
 for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});
 $('sClear').onclick=()=>{for(const id of ['sProduct','sStore','sRequester','sStatus','sPo','sVariance','sFrom','sTo','sKeyword'])$(id).value='';runSearch()};
 $('sExcel').onclick=guard($('sExcel'),exportExcel,e=>{$('searchMessage').textContent=e.message;$('searchMessage').className='error'});
@@ -890,7 +988,7 @@ if(!config?.apiKey||config.apiKey==='PASTE_API_KEY'){$('setup').classList.remove
   unsubCatalog=onSnapshot(collection(db,'catalog'),snap=>{
    if(currentUser?.uid!==user.uid)return;
    const map=new Map(snap.docs.map(x=>[x.id,x.data()]));
-   const base=defaults.map(([id,name,price,category])=>{const v=map.get(id);return {id,name:v?.name||name,price:category==='free'?0:(typeof v?.price==='number'?v.price:price),category}});
+   const base=defaults.map(([id,name,price,category])=>{const v=map.get(id);return {id,name:v?.name||name,price:category==='free'?0:(typeof v?.price==='number'?v.price:price),category,image:typeof v?.image==='string'?v.image:''}});
    const known=new Set(defaults.map(x=>x[0]));
    const additions=snap.docs.filter(d=>!known.has(d.id)).map(d=>({id:d.id,...d.data()})).filter(x=>x.id&&x.name&&['paid','free'].includes(x.category)&&typeof x.price==='number').map(x=>({...x,price:x.category==='free'?0:x.price}));
    products=[...base,...additions].sort(byItem);catalogLoaded=true;renderProducts();renderAdmin();refreshSearchOptions();

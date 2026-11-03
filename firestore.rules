@@ -24,6 +24,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Full-size product photos, loaded only when someone taps a photo. Admins only can change them.
+    match /catalogPhotos/{itemId} {
+      allow read: if signedIn();
+      allow create, update: if admin()
+        && request.resource.data.keys().hasOnly(['image', 'updatedBy', 'updatedAt'])
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 1000000;
+      allow delete: if false;
+    }
+
     match /settings/{settingId} {
       allow read: if signedIn() && settingId in ['poCounter', 'vendor'];
 
