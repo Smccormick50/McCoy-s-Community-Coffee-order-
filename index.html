@@ -426,7 +426,8 @@ async function pdf(o){
  return {d,filename};
 }
 let pdfUrl=null,pdfName='',pdfDoc=null,pdfOrder=null;
-function showPdf({d,filename},order=null){showBlob(d.output('blob'),filename,order,d)}
+let pdfKind='po';
+function showPdf({d,filename},order=null,kind='po'){pdfKind=kind;showBlob(d.output('blob'),filename,order,d)}
 function showBlob(blob,filename,order=null,d=null){
  if(pdfUrl)URL.revokeObjectURL(pdfUrl);
  pdfUrl=URL.createObjectURL(blob);pdfName=filename;pdfDoc=d;pdfOrder=order;
@@ -445,21 +446,26 @@ const recipients=()=>parseRecipients(vendorEmail||DEFAULT_VENDOR_EMAIL);
 const CC_EMAIL='Facilities Management <facilities_management@mccoys.com>';
 const headerAddrs=list=>list.map(r=>r.name?(/^[\x20-\x7e]*$/.test(r.name)?`"${r.name.replace(/"/g,'')}"`:'=?UTF-8?B?'+b64utf8(r.name)+'?=')+` <${r.addr}>`:`<${r.addr}>`).join(', ');
 const vendorTo=()=>recipients().map(r=>r.name?`${r.name} (${r.addr})`:r.addr).join(', ');
-const emailSubject=o=>"McCoy's Community Coffee PO "+o.poNumber;
-function emailBody(o){
+const emailSubject=(o,kind='po')=>kind==='variance'?`McCoy's Community Coffee PO ${o.poNumber} - receiving variance`:"McCoy's Community Coffee PO "+o.poNumber;
+function emailBody(o,kind='po'){
+ if(kind==='variance'){
+  const rows=varianceRows(o),sum=varianceSummary(rows),r=o.receiving||{};
+  const diffs=rows.filter(x=>x.diff).map(x=>`  ${x.id} ${x.description}: ordered ${x.ordered}, received ${x.received} (${x.diff<0?'SHORT '+(-x.diff):'OVER '+x.diff})${x.note?' - '+x.note:''}`).join('\n');
+  return `Community Coffee,\n\n`+(sum.lines?`We received PO ${o.poNumber} on ${fmtDate(r.date)} with the following differences:\n\n${diffs}\n\nNet difference: ${signed(sum.net)} unit${Math.abs(sum.net)===1?'':'s'} (${signedMoney(sum.netValue)} estimated).\n`+(sum.short?`Please credit or ship the missing item${sum.short===1?'':'s'}.\n`:''):`We received PO ${o.poNumber} on ${fmtDate(r.date)} complete, with no differences.\n`)+(r.notes?`\nReceiving notes: ${r.notes}\n`:'')+`\nThe variance report is attached.\n\nThank you.\n${employeeName(currentUser)}\nMcCoy's Building Supply`;
+ }
  const items=(o.lines||[]).map(l=>`  ${l.qty} x ${l.id} ${l.description}`).join('\n');
  return `Community Coffee,\n\nPlease process the attached purchase order.\n\nPO: ${o.poNumber}\nRequested by: ${o.requester}\nShip to: ${o.shipTo}\n\n${items}\n\nTotal units: ${o.units}\nEstimated total: ${money(o.total)}\n\nThank you.\n${employeeName(currentUser)}\nMcCoy's Building Supply`;
 }
 const b64utf8=str=>{const bytes=new TextEncoder().encode(str);let bin='';for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(bin)};
 const wrap76=b=>b.replace(/(.{76})/g,'$1\r\n');
 // Builds an unsent email (.eml). Outlook / Windows Mail open it as a draft with To, Subject, body and the PDF attached.
-function emlBlob(o,{d,filename}){
+function emlBlob(o,{d,filename},kind='po'){
  const boundary='----=_McCoysCoffeePO_'+Date.now().toString(36);
  const pdf64=wrap76(d.output('datauristring').split(',').pop());
  const eml=[
   'To: '+headerAddrs(recipients()),
   'Cc: '+headerAddrs(parseRecipients(CC_EMAIL)),
-  'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o))+'?=',
+  'Subject: =?UTF-8?B?'+b64utf8(emailSubject(o,kind))+'?=',
   'X-Unsent: 1',
   'MIME-Version: 1.0',
   `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -468,7 +474,7 @@ function emlBlob(o,{d,filename}){
   'Content-Type: text/plain; charset="utf-8"',
   'Content-Transfer-Encoding: base64',
   '',
-  wrap76(b64utf8(emailBody(o).replace(/\n/g,'\r\n'))),
+  wrap76(b64utf8(emailBody(o,kind).replace(/\n/g,'\r\n'))),
   '--'+boundary,
   `Content-Type: application/pdf; name="${filename}"`,
   'Content-Transfer-Encoding: base64',
@@ -481,21 +487,22 @@ function emlBlob(o,{d,filename}){
  return new Blob([eml],{type:'message/rfc822'});
 }
 // Returns 'eml' (desktop draft downloaded), 'shared', 'cancelled', or 'needtap' (phone needs another tap to share).
-async function sendEmail(o,r){
+async function sendEmail(o,r,kind='po'){
  const phone=matchMedia('(pointer:coarse)').matches&&!!navigator.canShare;
  if(phone){
   const file=new File([r.d.output('blob')],r.filename,{type:'application/pdf'});
   if(navigator.canShare({files:[file]})){
    try{await navigator.clipboard?.writeText(recipients()[0]?.addr||'')}catch{}
-   try{await navigator.share({files:[file],title:emailSubject(o),text:emailBody(o)});return 'shared'}
+   try{await navigator.share({files:[file],title:emailSubject(o,kind),text:emailBody(o,kind)});return 'shared'}
    catch(e){return e?.name==='AbortError'?'cancelled':'needtap'}
   }
  }
- downloadBlob(emlBlob(o,r),`PO-${String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')}-email.eml`);
+ downloadBlob(emlBlob(o,r,kind),`PO-${String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')}-${kind==='variance'?'variance-':''}email.eml`);
  return 'eml';
 }
-function emailResultMsg(o,res,saved){
+function emailResultMsg(o,res,saved,kind='po'){
  const pre=saved?'PO '+o.poNumber+' saved. ':'';
+ if(kind==='variance'){if(res==='eml')return `Variance email draft downloaded (PO-${o.poNumber}-variance-email.eml). Open it from your downloads: Outlook opens a draft to ${vendorTo()} (Cc Facilities Management) with the variance report attached.`;if(res==='shared')return `Variance report shared. If To was blank, paste ${vendorTo()} (it was copied for you) and Cc facilities_management@mccoys.com.`;if(res==='cancelled')return 'Email cancelled.'}
  if(res==='eml')return pre+`Email draft downloaded (PO-${o.poNumber}-email.eml). Open it from your downloads: Outlook opens a draft to ${vendorTo()} (Cc Facilities Management) with the PDF attached. Send it, then mark the PO as Sent.`;
  if(res==='shared')return pre+`PDF shared. If To was blank, paste ${vendorTo()} (it was copied for you) and Cc facilities_management@mccoys.com. After sending, mark the PO as Sent.`;
  if(res==='cancelled')return pre+'Email cancelled.';
@@ -523,7 +530,7 @@ function orderCard(o){
  det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
  const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
  const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o),o)}catch(e){alert(e.message)}};div.append(b2);
- div.append(...ticketFileButtons(o));
+ div.append(...varianceButton(o),...ticketFileButtons(o));
  if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
  const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
  for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
@@ -757,6 +764,77 @@ function ticketFileButtons(o){
  const files=o.receiving?.files||[];
  return files.map(f=>{const b=document.createElement('button');b.className='secondary';b.textContent='📎 '+(files.length>1?f.name.replace(/^PO-\d+-/,''):'Delivery ticket');b.title=f.name;b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await openTicketFile(o.id,f)}catch(err){alert('Could not open file: '+friendly(err))}finally{b.disabled=false}};return b});
 }
+/* ---------- receiving variance report ---------- */
+function varianceRows(o){
+ const rec=Object.fromEntries((o.receiving?.lines||[]).map(l=>[l.id,l]));
+ return (o.lines||[]).map(l=>{const r=rec[l.id];const received=r?Number(r.received):Number(l.qty);const diff=received-Number(l.qty);return {id:l.id,description:l.description,category:l.category,ordered:Number(l.qty),received,diff,price:Number(l.unitPrice)||0,diffValue:round2(diff*(Number(l.unitPrice)||0)),note:r?.note||''}});
+}
+function varianceSummary(rows){
+ const short=rows.reduce((s,x)=>s+Math.max(0,-x.diff),0),over=rows.reduce((s,x)=>s+Math.max(0,x.diff),0),lines=rows.filter(x=>x.diff).length;
+ return {short,over,lines,net:rows.reduce((s,x)=>s+x.diff,0),netValue:round2(rows.reduce((s,x)=>s+x.diffValue,0)),
+  orderedUnits:rows.reduce((s,x)=>s+x.ordered,0),receivedUnits:rows.reduce((s,x)=>s+x.received,0),
+  orderedValue:round2(rows.reduce((s,x)=>s+x.ordered*x.price,0)),receivedValue:round2(rows.reduce((s,x)=>s+x.received*x.price,0))};
+}
+const signed=n=>n>0?'+'+n:String(n);
+const signedMoney=n=>n<0?'-'+money(-n):n>0?'+'+money(n):money(0);
+async function variancePdf(o){
+ o=history.find(h=>h.id===o.id)||o;
+ const r=o.receiving;if(!r)throw Error('No receiving has been logged for PO '+o.poNumber+' yet. Use Log receiving first.');
+ await ensurePdf();
+ const rows=varianceRows(o),sum=varianceSummary(rows);
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',compress:true});const L=42,R=570,BOTTOM=712;let y=42;
+ const ink=()=>d.setTextColor(25,53,45),red=()=>d.setTextColor(161,37,37),green=()=>d.setTextColor(23,102,58);
+ try{const [mc,cc]=await Promise.all([logoData('mccoys-logo.png'),logoData('community-logo.png')]);const w1=190,w2=151;d.addImage(mc.data,'JPEG',L,31,w1,w1/mc.ratio);d.addImage(cc.data,'JPEG',R-w2,31,w2,w2/cc.ratio);y=Math.max(31+w1/mc.ratio,31+w2/cc.ratio)+30}catch(e){console.warn('Logos unavailable',e)}
+ ink();d.setFont('helvetica','bold');d.setFontSize(14);d.text('RECEIVING VARIANCE REPORT',L,y);y+=22;
+ d.setFont('helvetica','normal');d.setFontSize(10);
+ const pair=(a,b)=>{d.text(pdfSafe(a),L,y);if(b)d.text(pdfSafe(b),R,y,{align:'right'});y+=15};
+ pair('PO: '+o.poNumber,'Order date: '+fmtDate(orderDateStr(o)));
+ pair('Requested by: '+(o.requester||''),o.sentAt?.toDate?'Sent: '+o.sentAt.toDate().toLocaleDateString('en-US'):'');
+ pair('Received by: '+(r.by||''),'Received: '+fmtDate(r.date));
+ const ship=d.splitTextToSize(pdfSafe('Ship to: '+(o.shipTo||'')),R-L);d.text(ship,L,y);y+=ship.length*13+2;
+ pair('Vendor: Community Coffee Company, LLC');y+=4;
+ // status banner
+ const bad=sum.lines>0;
+ d.setFillColor(...(bad?[253,232,230]:[226,244,232]));d.roundedRect(L,y-2,R-L,30,5,5,'F');
+ d.setFont('helvetica','bold');d.setFontSize(11);bad?red():green();
+ d.text(bad?pdfSafe(`VARIANCE ON ${sum.lines} LINE${sum.lines===1?'':'S'}: ${[sum.short?sum.short+' short':'',sum.over?sum.over+' over':''].filter(Boolean).join(', ')}   |   Net ${signedMoney(sum.netValue)}`):'RECEIVED COMPLETE - NO VARIANCES',L+10,y+17);
+ ink();y+=44;
+ const C={desc:94,descW:178,ord:330,rcv:384,var:436,unit:494,val:R};
+ const head=()=>{d.setFont('helvetica','bold');d.setFontSize(8.5);d.text('ITEM',L,y);d.text('DESCRIPTION',C.desc,y);d.text('ORDERED',C.ord,y,{align:'right'});d.text('RECEIVED',C.rcv,y,{align:'right'});d.text('VARIANCE',C.var,y,{align:'right'});d.text('UNIT',C.unit,y,{align:'right'});d.text('VAR $',C.val,y,{align:'right'});y+=5;d.setDrawColor(25,53,45);d.setLineWidth(.8);d.line(L,y,R,y);y+=13;d.setFont('helvetica','normal')};
+ head();
+ for(const x of rows){
+  d.setFontSize(9.5);const desc=d.splitTextToSize(pdfSafe(x.description+(x.category==='free'?' (FREE)':'')),C.descW);
+  const noteL=x.note?(d.setFontSize(8),d.splitTextToSize(pdfSafe('Note: '+x.note),C.descW+(R-C.desc-C.descW)-10)):[];d.setFontSize(9.5);
+  const h=desc.length*11.5+noteL.length*10+7;
+  if(y+h>BOTTOM){d.addPage();y=48;ink();head();d.setFontSize(9.5)}
+  if(x.diff){d.setFillColor(253,240,238);d.rect(L-4,y-10,R-L+8,h,'F')}
+  ink();d.text(pdfSafe(x.id),L,y);d.text(desc,C.desc,y);d.text(String(x.ordered),C.ord,y,{align:'right'});
+  if(x.diff){red();d.setFont('helvetica','bold')}
+  d.text(String(x.received),C.rcv,y,{align:'right'});d.text(x.diff?(x.diff<0?'SHORT '+(-x.diff):'OVER '+x.diff):'OK',C.var,y,{align:'right'});
+  ink();d.setFont('helvetica','normal');d.text(money(x.price),C.unit,y,{align:'right'});
+  if(x.diff){x.diff<0?red():ink();d.setFont('helvetica','bold')}d.text(x.diff?signedMoney(x.diffValue):'-',C.val,y,{align:'right'});ink();d.setFont('helvetica','normal');
+  if(noteL.length){d.setFontSize(8);d.setFont('helvetica','italic');d.text(noteL,C.desc,y+desc.length*11.5);d.setFont('helvetica','normal')}
+  y+=h;
+ }
+ if(y+70>BOTTOM){d.addPage();y=48;ink()}
+ d.setDrawColor(25,53,45);d.line(L,y-6,R,y-6);y+=8;d.setFont('helvetica','bold');d.setFontSize(9.5);
+ d.text('TOTAL UNITS',L,y);d.text(String(sum.orderedUnits),C.ord,y,{align:'right'});d.text(String(sum.receivedUnits),C.rcv,y,{align:'right'});if(sum.net)red();d.text(sum.net?signed(sum.net):'0',C.var,y,{align:'right'});ink();y+=15;
+ d.text('ESTIMATED VALUE',L,y);d.text(money(sum.orderedValue),C.ord,y,{align:'right'});d.text(money(sum.receivedValue),C.rcv+0,y,{align:'right'});if(sum.netValue<0)red();d.text(signedMoney(sum.netValue),C.val,y,{align:'right'});ink();y+=20;
+ d.setFont('helvetica','normal');
+ const para=(t,size=9.5)=>{d.setFontSize(size);const tl=d.splitTextToSize(pdfSafe(t),R-L);if(y+tl.length*12>BOTTOM){d.addPage();y=48;ink()}d.text(tl,L,y);y+=tl.length*12+5};
+ if(sum.short)para(`Please credit or ship the ${sum.short} missing unit${sum.short===1?'':'s'} (estimated ${money(-rows.reduce((s,x)=>s+Math.min(0,x.diffValue),0))}).`);
+ if(r.notes)para('Receiving notes: '+r.notes);
+ if(o.notes)para('Order notes: '+o.notes);
+ if(r.files?.length)para('Delivery ticket on file with this PO: '+r.files.map(f=>f.name).join(', ')+'.');
+ footer(d,'Values use the unit prices on the PO and are estimates. Confirm credits with Community Coffee.');
+ return {d,filename:`PO-${String(o.poNumber).replace(/[^a-z0-9_-]/gi,'_')}-variance-report.pdf`};
+}
+function varianceButton(o){
+ if(!o.receiving)return [];
+ const b=document.createElement('button');b.className='secondary';b.textContent=o.hasVariance?'⚠ Variance PDF':'Variance PDF';
+ b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{showPdf(await variancePdf(o),o,'variance')}catch(err){alert(err.message||err)}finally{b.disabled=false}};
+ return [b];
+}
 async function saveReceiving(){
  const o=receivingOrder;if(!o)throw Error('No PO selected.');
  const date=$('recvDate').value;if(!date)throw Error('Enter the date received.');
@@ -830,7 +908,7 @@ function renderSearchTable(f){
   const acts=tr.lastElementChild;
   const bOpen=document.createElement('button');bOpen.textContent='Open';bOpen.onclick=e=>{e.stopPropagation();load(o)};
   const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o),o)}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
-  acts.append(bOpen,bPdf);
+  acts.append(bOpen,bPdf,...varianceButton(o));
   const toggle=()=>{open?searchExpanded.delete(o.id):searchExpanded.add(o.id);renderSearchTable(f)};
   tr.onclick=toggle;tr.title=open?'Click to hide items':'Click to show items';
   body.append(tr);
@@ -1200,7 +1278,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('click',async e=>{const a=e.target.closest('[data-sfile]');if(!a)return;e.preventDefault();e.stopPropagation();const [oid,k]=a.dataset.sfile.split('|');const o=history.find(h=>h.id===oid);const f=o?.receiving?.files?.[Number(k)];if(!f)return;try{await openTicketFile(oid,f)}catch(err){alert('Could not open file: '+friendly(err))}},true);
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
-$('pdfClose').onclick=closePdf;$('pdfEmail').onclick=guard($('pdfEmail'),async()=>{if(!pdfOrder||!pdfDoc)return;const o=pdfOrder,res=await sendEmail(o,{d:pdfDoc,filename:pdfName});closePdf();toast(emailResultMsg(o,res,false))},e=>alert(friendly(e)));$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
+$('pdfClose').onclick=closePdf;$('pdfEmail').onclick=guard($('pdfEmail'),async()=>{if(!pdfOrder||!pdfDoc)return;const o=pdfOrder,kind=pdfKind,res=await sendEmail(o,{d:pdfDoc,filename:pdfName},kind);closePdf();toast(emailResultMsg(o,res,false,kind))},e=>alert(friendly(e)));$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');
 $('pdfModal').addEventListener('click',e=>{if(e.target===$('pdfModal'))closePdf()});document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('imgZoom').classList.contains('hidden')){closeZoom();return}if(!$('pdfModal').classList.contains('hidden'))closePdf()});
 for(const id of ['sPo','sKeyword'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter')runSearch()});
 $('sClear').onclick=()=>{for(const id of ['sProduct','sStore','sRequester','sStatus','sPo','sVariance','sFrom','sTo','sKeyword'])$(id).value='';runSearch()};
