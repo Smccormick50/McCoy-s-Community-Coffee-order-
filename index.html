@@ -63,6 +63,9 @@ img.thumb{cursor:zoom-in}.thumb.noimg{background:#f1f5f3;color:#9aaba2;font-size
 #imgZoom{position:fixed;inset:0;background:#0b1f18cc;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
 #imgZoom img{max-width:94vw;max-height:80vh;min-width:min(320px,90vw);object-fit:contain;background:#fff;border-radius:12px;padding:10px;box-shadow:0 10px 40px #0007}#imgZoom p{color:#fff;font-weight:700;margin:12px 0 0;text-align:center;font-size:1.05rem}#imgZoom small{color:#d6e6dd;margin-top:4px;min-height:1em;text-align:center}
 #imgZoomClose{position:fixed;top:14px;right:14px;width:46px;height:46px;border-radius:50%;padding:0;font-size:1.3rem;background:#fff;color:#00543b;box-shadow:0 4px 14px #0005}
+.file-list{list-style:none;padding:0;margin:6px 0 8px}.file-list li{padding:4px 0}.file-list a{font-weight:700;color:#00543b}button.small{padding:3px 8px;font-size:.75rem;margin-left:6px}
+.scan-box{border:1px dashed #b9cfc4;border-radius:12px;padding:12px;margin:12px 0;background:#f8fbf9}
+.scan-box textarea{font-family:ui-monospace,Consolas,monospace;font-size:.8rem}
 .note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}
 .lock-banner{background:#fff1e0;border-left:4px solid #c77700;padding:11px 12px;border-radius:6px;margin-bottom:14px;font-size:.9rem;font-weight:600}
 .error{color:#a12525;white-space:pre-wrap}
@@ -172,6 +175,19 @@ body.noscroll{overflow:hidden}
 <section id="receive" class="panel hidden">
 <h2 id="recvTitle">Receive PO</h2>
 <p class="muted" id="recvInfo"></p>
+<div class="scan-box">
+<b>Delivery ticket</b> <span class="muted">Scan the ticket or invoice that came with the order to compare it to this PO.</span>
+<div class="actions" style="margin-top:8px"><button type="button" class="gold" id="scanCamBtn">&#128247; Scan with camera</button><button type="button" class="secondary" id="scanFileBtn">Upload PDF or photo</button></div>
+<input type="file" id="scanCam" accept="image/*" capture="environment" class="hidden"><input type="file" id="scanFile" accept="application/pdf,image/*" multiple class="hidden">
+<p id="scanStatus" class="muted" role="status"></p>
+<div id="ticketFiles"></div>
+<div id="scanResult" class="hidden">
+<label for="scanText">Ticket text (correct anything the scan misread, then click Match)</label>
+<textarea id="scanText" rows="8" spellcheck="false"></textarea>
+<div class="actions" style="margin-top:8px"><button type="button" id="scanMatchBtn">Match to PO</button><button type="button" class="secondary" id="scanTxtBtn">Download as .txt</button><button type="button" class="secondary" id="scanClearBtn">Clear scan</button></div>
+<div id="scanMatches"></div>
+</div>
+</div>
 <div class="grid"><div><label for="recvDate">Date received</label><input id="recvDate" type="date"></div><div><label for="recvBy">Received by</label><input id="recvBy" readonly></div></div>
 <p class="muted" style="margin-top:14px">Enter the quantity that actually arrived for each line. Anything different from what was ordered is logged as a variance. Ordered quantities cannot be changed.</p>
 <div id="recvLines"></div>
@@ -396,6 +412,7 @@ async function pdf(o){
   if(!diffs.length){para('All items received as ordered.')}
   for(const l of r.lines.filter(l=>l.received!==l.ordered||l.note)){const diff=l.received-l.ordered;const tag=diff<0?'SHORT '+(-diff):diff>0?'OVER '+diff:'OK';if(diff)red();para(`${l.id}  ${l.description}: ordered ${l.ordered}, received ${l.received} (${tag})${l.note?' - '+l.note:''}`);ink()}
   if(r.notes)para('Receiving notes: '+r.notes);
+  if(r.files?.length)para(`Delivery ticket saved with this PO in the app: ${r.files.map(f=>f.name).join(', ')}.`);
  }
  d.setFont('helvetica','normal');
  if(o.notes){y+=6;para('Order notes: '+o.notes)}
@@ -404,9 +421,10 @@ async function pdf(o){
  return {d,filename};
 }
 let pdfUrl=null,pdfName='',pdfDoc=null,pdfOrder=null;
-function showPdf({d,filename},order=null){
+function showPdf({d,filename},order=null){showBlob(d.output('blob'),filename,order,d)}
+function showBlob(blob,filename,order=null,d=null){
  if(pdfUrl)URL.revokeObjectURL(pdfUrl);
- pdfUrl=URL.createObjectURL(d.output('blob'));pdfName=filename;pdfDoc=d;pdfOrder=order;
+ pdfUrl=URL.createObjectURL(blob);pdfName=filename;pdfDoc=d;pdfOrder=order;
  $('pdfTitle').textContent=filename;$('pdfFrame').src=pdfUrl;
  $('pdfEmail').classList.toggle('hidden',!order);
  $('pdfModal').classList.remove('hidden');document.body.classList.add('noscroll');$('pdfDownload').focus();
@@ -500,6 +518,7 @@ function orderCard(o){
  det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
  const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
  const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o),o)}catch(e){alert(e.message)}};div.append(b2);
+ div.append(...ticketFileButtons(o));
  if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
  const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
  for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
@@ -553,7 +572,9 @@ function openReceiving(o){
  $('recvNotes').value=order.receiving?.notes||'';$('recvMessage').textContent='';
  $('recvLines').innerHTML=(order.lines||[]).map(l=>`<div class="recv-row" data-row="${esc(l.id)}"><div><b>${esc(l.description)}</b><small>Item ${esc(l.id)} · Ordered <b>${l.qty}</b></small></div><div><label>Received</label><input type="number" min="0" step="1" inputmode="numeric" data-recv="${esc(l.id)}" value="${esc(prev[l.id]?.received??l.qty)}" aria-label="Received quantity for ${esc(l.description)}"></div><input class="recv-note" data-note="${esc(l.id)}" maxlength="200" placeholder="Variance note (short, damaged, substituted, back-ordered…)" value="${esc(prev[l.id]?.note||'')}"></div>`).join('');
  document.querySelectorAll('[data-recv]').forEach(e=>e.addEventListener('input',updateRecvSummary));
- updateRecvSummary();tab('receive');
+ pendingTicketFiles=[];renderTicketFiles();
+ $('scanText').value=order.receiving?.ticketText||'';$('scanResult').classList.toggle('hidden',!order.receiving?.ticketText);$('scanMatches').innerHTML='';scanStatus(order.receiving?.ticketText?'A delivery ticket scan is saved with this PO.':'');
+ updateRecvSummary();tab('receive');if(order.receiving?.ticketText)matchScan();
 }
 function updateRecvSummary(){
  const o=receivingOrder;if(!o)return;let short=0,over=0,lines=0;
@@ -561,14 +582,187 @@ function updateRecvSummary(){
  const s=$('recvSummary');s.classList.toggle('bad',lines>0);
  s.textContent=lines?`Variance on ${lines} line${lines===1?'':'s'}: ${short?short+' short':''}${short&&over?', ':''}${over?over+' over':''}. Add a note explaining each difference.`:'Everything received as ordered.';
 }
+/* ---------- delivery ticket scan (photo / PDF -> text -> compare) ---------- */
+const TESS='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/';
+const PDFJS='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/';
+let ocrWorker=null,scanMatchesData=[];
+function scanStatus(t,bad=false){$('scanStatus').textContent=t;$('scanStatus').className=bad?'error':'muted'}
+async function getOcr(){
+ if(ocrWorker)return ocrWorker;
+ await loadScript(TESS+'tesseract.min.js',()=>!!window.Tesseract);
+ ocrWorker=await Tesseract.createWorker('eng',1,{workerPath:TESS+'worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/',langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int',
+  logger:m=>{if(m.status==='recognizing text')scanStatus(`Reading text… ${Math.round((m.progress||0)*100)}%`);else if(/load|initial/i.test(m.status))scanStatus('Loading text reader (first time can take a minute)…')}});
+ await ocrWorker.setParameters({preserve_interword_spaces:'1'});
+ return ocrWorker;
+}
+// Shrink, gray and boost contrast: helps with thermal receipts and phone photos.
+function prepCanvas(src,w,h){
+ const sc=Math.min(1.5,2200/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+ const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(src,0,0,c.width,c.height);
+ const im=g.getImageData(0,0,c.width,c.height),d=im.data;let lo=255,hi=0;
+ for(let i=0;i<d.length;i+=4){const v=.299*d[i]+.587*d[i+1]+.114*d[i+2];d[i]=v;if(v<lo)lo=v;if(v>hi)hi=v}
+ const span=Math.max(40,hi-lo);for(let i=0;i<d.length;i+=4){const v=Math.max(0,Math.min(255,(d[i]-lo)*255/span));d[i]=d[i+1]=d[i+2]=v}
+ g.putImageData(im,0,0);return c;
+}
+// Reads the page twice: auto layout (best for neat tickets) and one-column (best for slanted receipts),
+// and keeps the reading with more complete item lines (an item number and an amount on the same line).
+const ocrScore=t=>t.split('\n').filter(l=>/\b\d{5}\b/.test(l)&&/\d+[.,]\d{2}/.test(l)).length;
+async function ocrBest(canvas){
+ const w=await getOcr();let best=null;
+ for(const psm of ['3','4']){await w.setParameters({tessedit_pageseg_mode:psm});const t=(await w.recognize(canvas)).data.text;const sc=ocrScore(t);if(!best||sc>best.sc)best={t,sc}}
+ return best.t;
+}
+async function ocrImageFile(file){
+ const url=URL.createObjectURL(file);
+ try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(Error('Could not open that picture. Use JPG or PNG (on iPhone, a camera photo works).'));i.src=url});
+  return await ocrBest(prepCanvas(img,img.naturalWidth,img.naturalHeight))}
+ finally{URL.revokeObjectURL(url)}
+}
+async function pdfText(file){
+ await loadScript(PDFJS+'pdf.min.js',()=>!!window.pdfjsLib);pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS+'pdf.worker.min.js';
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const out=[];
+ for(let n=1;n<=Math.min(pdf.numPages,10);n++){
+  const page=await pdf.getPage(n);scanStatus(`Reading PDF page ${n} of ${pdf.numPages}…`);
+  const tc=await page.getTextContent();const items=tc.items.filter(i=>i.str&&i.str.trim());
+  if(items.length>5){ // real text: rebuild lines by position
+   const rows=[];for(const it of items){const y=it.transform[5],x=it.transform[4];let row=rows.find(r=>Math.abs(r.y-y)<3);if(!row){row={y,parts:[]};rows.push(row)}row.parts.push({x,s:it.str})}
+   rows.sort((a,b)=>b.y-a.y);out.push(rows.map(r=>r.parts.sort((a,b)=>a.x-b.x).map(p=>p.s).join(' ').replace(/\s+/g,' ').trim()).join('\n'));
+  }else{ // scanned page: render and OCR
+   const vp=page.getViewport({scale:2.2});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+   out.push(await ocrBest(prepCanvas(c,c.width,c.height)));
+  }
+ }
+ return out.join('\n');
+}
+async function scanFiles(files){
+ if(!files?.length)return;
+ const texts=[],photos=[];
+ for(const f of files){
+  scanStatus('Reading '+f.name+'…');
+  const isPdf=/pdf$/i.test(f.type)||/\.pdf$/i.test(f.name);
+  texts.push(isPdf?await pdfText(f):await ocrImageFile(f));
+  if(isPdf)pendingTicketFiles.push({blob:f,name:/^PO-/i.test(f.name)?f.name:`PO-${receivingOrder?.poNumber}-${f.name.replace(/[^\w.-]+/g,'_')}`,type:'application/pdf'});else photos.push(f);
+ }
+ if(photos.length){scanStatus('Making a PDF of the photo'+(photos.length>1?'s':'')+'…');pendingTicketFiles.push(await photosToPdf(photos,receivingOrder?.poNumber))}
+ renderTicketFiles();
+ const t=texts.join('\n').replace(/[ \t]+\n/g,'\n').trim();
+ if(!t)throw Error('No text was found. Try a closer, well-lit photo with the ticket flat.');
+ const box=$('scanText');box.value=(box.value.trim()?box.value.trim()+'\n\n--- next page ---\n':'')+t;
+ $('scanResult').classList.remove('hidden');
+ scanStatus('Text captured. The ticket file will be saved with this PO when you click Save receiving. Check the text, then see the comparison below.');
+ matchScan();
+}
+// OCR often reads 0 as O, 1 as l/I, 5 as S, 8 as B inside numbers.
+const fixDigits=tok=>(tok.replace(/[^0-9]/g,'').length>=2||/^[OolISB0-9]+$/.test(tok))&&/\d/.test(tok)?tok.replace(/[Oo]/g,'0').replace(/[lI|]/g,'1').replace(/S/g,'5').replace(/B/g,'8'):tok;
+const normLine=l=>l.split(/\s+/).map(fixDigits).join(' ');
+// Removes OCR junk (€ : | ~ ..) without breaking prices like 19.40 or sizes like 3.00OZ.
+const cleanLine=l=>normLine(l).replace(/[^\w\s.,$+-]/g,' ').replace(/\.{2,}/g,' ').split(/\s+/).map(t=>t.replace(/^[.,]+|[.,]+$/g,'')).filter(Boolean).join(' ');
+function qtyFromLine(line,id,unitPrice){
+ const toks=cleanLine(line).split(' '),bare=x=>x.replace(/^0+/,'');
+ const idIdx=toks.findIndex(t=>bare(t.replace(/[^0-9A-Za-z_-]/g,''))===bare(String(id)));
+ const ints=[],decs=[],loose=[];
+ toks.forEach((t,i)=>{if(i===idIdx)return;const c=t.replace(/[,$]/g,'').replace(/^[+]/,'');
+  if(/^\d{1,4}$/.test(c))ints.push({v:Number(c),i});
+  else if(/^\d+\.\d{2}$/.test(c))decs.push({v:Number(c),i});
+  else if(/^\d{1,3}[A-Za-z0-9]{1,2}$/.test(c)&&i>idIdx){for(let k=1;k<=3&&k<c.length;k++)if(/^\d+$/.test(c.slice(0,k)))loose.push({v:Number(c.slice(0,k)),i})}}); // e.g. "26s" = "2 CS" misread
+ const near=(a,b)=>Math.abs(a-b)<0.015;
+ // 1) a quantity on the line that makes qty x price = extended
+ const prices=decs.map(d=>d.v);if(unitPrice>0)prices.push(unitPrice);
+ for(const q of [...ints,...loose]){if(q.v===0)continue;for(const pr of prices)for(const e of decs)if(e.v!==pr&&near(q.v*pr,e.v))return {qty:q.v,how:'checked: qty × price = total'}}
+ // 2) quantity unreadable: work it out from extended / unit price
+ const pairs=[];for(let k=0;k+1<decs.length;k++)pairs.push([decs[k].v,decs[k+1].v]);if(unitPrice>0)for(const e of decs)if(!near(e.v,unitPrice))pairs.unshift([unitPrice,e.v]);
+ for(const [pr,e] of pairs){if(pr<=0||e<=pr*0.99)continue;const q=Math.round(e/pr);if(q>=1&&q<=9999&&near(q*pr,e))return {qty:q,how:'worked out from total ÷ price'}}
+ // 3) fall back to the number just before the first price
+ // only guess when the line looks like a ticket line (a price after the item); junk text gives null = "Check"
+ const firstDec=decs.find(d=>d.i>idIdx);if(!firstDec)return null;
+ const before=ints.filter(q=>q.i>idIdx&&q.i<firstDec.i);if(!before.length)return null;
+ const pick=before[before.length-1];
+ return {qty:pick.v,how:'best guess, please check'};
+}
+function matchScan(){
+ const o=receivingOrder;if(!o)return;
+ const lines=$('scanText').value.split(/\n/).map(l=>l.trim()).filter(Boolean);
+ const hasId=(l,id)=>normLine(l).split(/\s+/).some(t=>t.replace(/[^0-9A-Za-z_-]/g,'').replace(/^0+/,'')===String(id).replace(/^0+/,''));
+ scanMatchesData=(o.lines||[]).map(l=>{
+  const hits=lines.filter(x=>hasId(x,l.id));
+  if(!hits.length)return {id:l.id,description:l.description,ordered:l.qty,qty:null,how:'not found on ticket',line:''};
+  const r=qtyFromLine(hits[0],l.id,l.unitPrice);
+  return {id:l.id,description:l.description,ordered:l.qty,qty:r?.qty??null,how:r?r.how:'item found, quantity unreadable',line:hits[0]};
+ });
+ // items on the ticket that are in the catalog but not on this PO
+ const onPo=new Set((o.lines||[]).map(l=>l.id));
+ const extras=products.filter(p=>!onPo.has(p.id)&&/^\d{4,}$/.test(p.id)&&lines.some(x=>hasId(x,p.id))).map(p=>{const line=lines.find(x=>hasId(x,p.id));return {id:p.id,description:p.name,qty:qtyFromLine(line,p.id,p.price)?.qty??'?',line}});
+ const st=m=>m.qty==null?['Check','bad']:m.qty===m.ordered?['Match','okc']:m.qty<m.ordered?[`Short ${m.ordered-m.qty}`,'bad']:[`Over ${m.qty-m.ordered}`,'bad'];
+ $('scanMatches').innerHTML=`<table class="items" style="margin-top:10px"><thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">On ticket</th><th>Result</th><th>Ticket line</th></tr></thead><tbody>${scanMatchesData.map(m=>{const [t,c]=st(m);return `<tr><td>${esc(m.id)}</td><td>${esc(m.description)}</td><td class="num">${m.ordered}</td><td class="num ${m.qty!=null&&m.qty!==m.ordered?'bad':''}">${m.qty??'—'}</td><td class="${c}">${t}<br><small class="muted">${esc(m.how)}</small></td><td><small>${esc(m.line.slice(0,90))}</small></td></tr>`}).join('')}${extras.map(x=>`<tr class="imp-chg"><td>${esc(x.id)}</td><td>${esc(x.description)}</td><td class="num">0</td><td class="num bad">${esc(x.qty)}</td><td class="bad">On ticket, not on PO</td><td><small>${esc(x.line.slice(0,90))}</small></td></tr>`).join('')}</tbody></table>
+ <div class="actions" style="margin-top:10px"><button type="button" class="gold" id="scanFillBtn" ${scanMatchesData.some(m=>m.qty!=null)?'':'disabled'}>Fill received quantities from ticket</button></div>
+ <p class="muted" style="font-size:.82rem">Items marked "Check" were not read clearly. Enter those by hand. ${extras.length?'Items "On ticket, not on PO" are added to the receiving notes when you fill.':''}</p>`;
+ $('scanFillBtn').onclick=()=>{
+  let n=0;for(const m of scanMatchesData){if(m.qty==null)continue;const inp=byData('data-recv',m.id);if(inp){inp.value=m.qty;n++}const note=byData('data-note',m.id);if(note&&m.qty!==m.ordered&&!note.value.trim())note.value='Per delivery ticket: '+m.qty}
+  if(extras.length){const add=extras.map(x=>`Extra on ticket: ${x.id} ${x.description} qty ${x.qty}`).join('\n');if(!$('recvNotes').value.includes(add))$('recvNotes').value=($('recvNotes').value.trim()+'\n'+add).trim()}
+  updateRecvSummary();scanStatus(`Filled ${n} received quantit${n===1?'y':'ies'} from the ticket. Check them, then Save receiving.`);
+  $('recvLines').scrollIntoView({behavior:'smooth',block:'start'});
+ };
+}
+function downloadScanTxt(){
+ const o=receivingOrder;const t=$('scanText').value;if(!t.trim())return;
+ downloadBlob(new Blob([`PO ${o?.poNumber??''} delivery ticket scan, ${new Date().toLocaleString()}\r\n\r\n`+t.replace(/\n/g,'\r\n')],{type:'text/plain'}),`PO-${o?.poNumber??'ticket'}-delivery-ticket.txt`);
+}
+/* ---------- delivery ticket files saved with the PO ---------- */
+// Firebase Storage needs a paid plan, so files are stored in Firestore, split into pieces under the 1 MB document limit.
+const FILE_CHUNK=700000,FILE_MAX=8*1024*1024;
+let pendingTicketFiles=[];
+const fmtSize=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const blobToB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',').pop());r.onerror=()=>rej(Error('Could not read the file.'));r.readAsDataURL(b)});
+// Phone photos are combined into one PDF (one page per photo) so every saved ticket is a PDF.
+async function photosToPdf(files,poNumber){
+ await ensurePdf();
+ const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',compress:true});const W=612,H=792,M=18;
+ for(let i=0;i<files.length;i++){
+  const url=URL.createObjectURL(files[i]);
+  try{const img=await new Promise((res,rej)=>{const x=new Image();x.onload=()=>res(x);x.onerror=()=>rej(Error('Could not open '+files[i].name));x.src=url});
+   const sc=Math.min(1,1800/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*sc);c.height=Math.round(img.naturalHeight*sc);
+   const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);
+   if(i)d.addPage();const r=Math.min((W-2*M)/c.width,(H-2*M)/c.height);const w=c.width*r,h=c.height*r;
+   d.addImage(c.toDataURL('image/jpeg',.72),'JPEG',(W-w)/2,(H-h)/2,w,h);
+  }finally{URL.revokeObjectURL(url)}
+ }
+ return {blob:d.output('blob'),name:`PO-${poNumber}-delivery-ticket-${todayLocal()}.pdf`,type:'application/pdf'};
+}
+function renderTicketFiles(){
+ const o=receivingOrder;const saved=o?.receiving?.files||[];
+ const box=$('ticketFiles');if(!box)return;
+ if(!saved.length&&!pendingTicketFiles.length){box.innerHTML='';return}
+ box.innerHTML=`<b style="font-size:.88rem">Ticket files</b><ul class="file-list">${saved.map((f,i)=>`<li>&#128206; <a href="#" data-file-saved="${i}">${esc(f.name)}</a> <small class="muted">${fmtSize(f.size)} · ${esc(fmtDate(f.date))} · ${esc(f.by||'')}</small></li>`).join('')}${pendingTicketFiles.map((f,i)=>`<li>&#128206; <a href="#" data-file-pending="${i}">${esc(f.name)}</a> <small class="muted">${fmtSize(f.blob.size)} · saves when you click Save receiving</small> <button type="button" class="secondary small" data-file-drop="${i}">Remove</button></li>`).join('')}</ul>`;
+}
+async function uploadTicketFile(orderId,f){
+ if(f.blob.size>FILE_MAX)throw Error(`${f.name} is ${fmtSize(f.blob.size)}; the limit is 8 MB.`);
+ const id=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+ const b64=await blobToB64(f.blob),n=Math.ceil(b64.length/FILE_CHUNK);
+ for(let i=0;i<n;i++)await setDoc(doc(db,'orders',orderId,'files',id,'chunks',String(i)),{data:b64.slice(i*FILE_CHUNK,(i+1)*FILE_CHUNK)});
+ await setDoc(doc(db,'orders',orderId,'files',id),{name:f.name,type:f.type,size:f.blob.size,chunks:n,uploadedBy:currentUser.uid,uploadedByName:employeeName(currentUser),uploadedAt:serverTimestamp()});
+ return {id,name:f.name,type:f.type,size:f.blob.size,chunks:n,by:employeeName(currentUser),date:todayLocal()};
+}
+async function loadTicketFile(orderId,f){
+ const parts=[];for(let i=0;i<f.chunks;i++){const snap=await getDoc(doc(db,'orders',orderId,'files',f.id,'chunks',String(i)));if(!snap.exists())throw Error('This file is incomplete (a piece is missing).');parts.push(snap.data().data)}
+ const bin=atob(parts.join(''));const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+ return new Blob([bytes],{type:f.type||'application/pdf'});
+}
+async function openTicketFile(orderId,f){toast('Opening '+f.name+'…');showBlob(await loadTicketFile(orderId,f),f.name);$('toast').classList.add('hidden')}
+function ticketFileButtons(o){
+ const files=o.receiving?.files||[];
+ return files.map(f=>{const b=document.createElement('button');b.className='secondary';b.textContent='📎 '+(files.length>1?f.name.replace(/^PO-\d+-/,''):'Delivery ticket');b.title=f.name;b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await openTicketFile(o.id,f)}catch(err){alert('Could not open file: '+friendly(err))}finally{b.disabled=false}};return b});
+}
 async function saveReceiving(){
  const o=receivingOrder;if(!o)throw Error('No PO selected.');
  const date=$('recvDate').value;if(!date)throw Error('Enter the date received.');
  const recLines=(o.lines||[]).map(l=>{const raw=String(byData('data-recv',l.id)?.value??'').trim();if(!/^\d+$/.test(raw))throw Error(`Received quantity for item ${l.id} must be a whole number (0 or more).`);return {id:l.id,description:l.description,ordered:l.qty,received:Number(raw),note:String(byData('data-note',l.id)?.value||'').trim()}});
  const hasVariance=recLines.some(l=>l.received!==l.ordered);
- await updateDoc(doc(db,'orders',o.id),{receiving:{date,by:employeeName(currentUser),byEmail:currentUser.email,notes:$('recvNotes').value.trim(),lines:recLines,savedAt:serverTimestamp()},hasVariance,status:'Received',updatedAt:serverTimestamp(),updatedBy:currentUser.email});
- receivingOrder=null;tab('history');
- $('historyMessage').className='';$('historyMessage').textContent=`PO ${o.poNumber} received${hasVariance?' with variances logged':' complete'}.`;
+ const scanText=$('scanText').value.trim().slice(0,20000);
+ const files=[...(o.receiving?.files||[])];let fileNote='';
+ for(const f of pendingTicketFiles){try{$('recvMessage').className='';$('recvMessage').textContent='Saving '+f.name+'…';files.push(await uploadTicketFile(o.id,f))}catch(e){console.warn('Ticket file not saved',e);fileNote=` ${f.name} could not be saved: `+(e?.code==='permission-denied'?'publish the latest firestore.rules in Firebase.':e.message)}}
+ await updateDoc(doc(db,'orders',o.id),{receiving:{date,by:employeeName(currentUser),byEmail:currentUser.email,notes:$('recvNotes').value.trim(),lines:recLines,...(scanText?{ticketText:scanText}:{}),...(files.length?{files}:{}),savedAt:serverTimestamp()},hasVariance,status:'Received',updatedAt:serverTimestamp(),updatedBy:currentUser.email});
+ receivingOrder=null;pendingTicketFiles=[];tab('history');
+ $('historyMessage').className=fileNote?'error':'';$('historyMessage').textContent=`PO ${o.poNumber} received${hasVariance?' with variances logged':' complete'}.`+(files.length>(o.receiving?.files||[]).length&&!fileNote?' Delivery ticket saved with the PO.':'')+fileNote;
 }
 
 /* ---------- PO search & reporting ---------- */
@@ -648,8 +842,9 @@ function poDetailRow(r){
  const info=[];
  if(o.sentAt?.toDate)info.push('Sent '+o.sentAt.toDate().toLocaleDateString()+(o.sentBy?' by '+o.sentBy:''));
  if(o.receiving)info.push(`Received ${fmtDate(o.receiving.date)} by ${o.receiving.by}`);
+ const fileLinks=(o.receiving?.files||[]).map((f,k)=>`<a href="#" data-sfile="${esc(o.id)}|${k}">&#128206; ${esc(f.name)}</a>`).join(' &nbsp; ');
  const notes=[o.notes?'<b>Order notes:</b> '+esc(o.notes):'',o.receiving?.notes?'<b>Receiving notes:</b> '+esc(o.receiving.notes):''].filter(Boolean).join('<br>');
- tr.innerHTML=`<td></td><td colspan="10"><div class="po-detail"><div class="muted" style="margin-bottom:6px">${esc(o.shipTo||'')}${info.length?' · '+esc(info.join(' · ')):''}</div><table class="items"><thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received</th><th>Variance</th><th class="num">Unit</th><th class="num">Extended</th><th>Note</th></tr></thead><tbody>${items}</tbody></table>${notes?`<p style="margin:8px 0 0;font-size:.84rem">${notes}</p>`:''}</div></td>`;
+ tr.innerHTML=`<td></td><td colspan="10"><div class="po-detail"><div class="muted" style="margin-bottom:6px">${esc(o.shipTo||'')}${info.length?' · '+esc(info.join(' · ')):''}</div><table class="items"><thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">Received</th><th>Variance</th><th class="num">Unit</th><th class="num">Extended</th><th>Note</th></tr></thead><tbody>${items}</tbody></table>${notes?`<p style="margin:8px 0 0;font-size:.84rem">${notes}</p>`:''}${fileLinks?`<p style="margin:8px 0 0;font-size:.84rem"><b>Ticket files:</b> ${fileLinks}</p>`:''}</div></td>`;
  return tr;
 }
 function searchFilterText(){
@@ -963,6 +1158,20 @@ $('emailOrder').onclick=guard($('emailOrder'),async()=>{await ensurePdf();const 
 $('markSent').onclick=guard($('markSent'),async()=>{const o=history.find(h=>h.id===lastSavedOrder?.id)||lastSavedOrder;if(!o)return;await setStatus(o,'Sent');lastSavedOrder={...o,status:'Sent'};updateMarkSent();msg('PO '+o.poNumber+' marked Sent and locked.')},e=>msg('Could not mark as sent: '+friendly(e),true));
 $('receiveFromForm').onclick=()=>lockedOrder&&openReceiving(lockedOrder);
 $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Receiving save failed',e);$('recvMessage').textContent=friendly(e);$('recvMessage').className='error'});
+$('scanCamBtn').onclick=()=>{$('scanCam').value='';$('scanCam').click()};
+$('scanFileBtn').onclick=()=>{$('scanFile').value='';$('scanFile').click()};
+for(const id of ['scanCam','scanFile'])$(id).onchange=async()=>{const b1=$('scanCamBtn'),b2=$('scanFileBtn');b1.disabled=b2.disabled=true;try{await scanFiles([...$(id).files])}catch(e){console.error('Scan failed',e);scanStatus('Scan failed: '+(e.message||e),true)}finally{b1.disabled=b2.disabled=false}};
+$('scanMatchBtn').onclick=matchScan;$('scanTxtBtn').onclick=downloadScanTxt;
+$('scanClearBtn').onclick=()=>{pendingTicketFiles=[];renderTicketFiles();$('scanText').value='';$('scanMatches').innerHTML='';$('scanResult').classList.add('hidden');scanStatus('')};
+document.addEventListener('click',async e=>{
+ const s=e.target.closest('[data-file-saved]'),pd=e.target.closest('[data-file-pending]'),dr=e.target.closest('[data-file-drop]');
+ if(!s&&!pd&&!dr)return;e.preventDefault();
+ try{if(s){const o=receivingOrder;await openTicketFile(o.id,o.receiving.files[Number(s.dataset.fileSaved)])}
+  else if(pd){const f=pendingTicketFiles[Number(pd.dataset.filePending)];showBlob(f.blob,f.name)}
+  else{pendingTicketFiles.splice(Number(dr.dataset.fileDrop),1);renderTicketFiles()}}
+ catch(err){alert('Could not open file: '+friendly(err))}
+});
+document.addEventListener('click',async e=>{const a=e.target.closest('[data-sfile]');if(!a)return;e.preventDefault();e.stopPropagation();const [oid,k]=a.dataset.sfile.split('|');const o=history.find(h=>h.id===oid);const f=o?.receiving?.files?.[Number(k)];if(!f)return;try{await openTicketFile(oid,f)}catch(err){alert('Could not open file: '+friendly(err))}},true);
 $('recvCancel').onclick=()=>{receivingOrder=null;tab('history')};
 $('sRun').onclick=runSearch;
 $('pdfClose').onclick=closePdf;$('pdfEmail').onclick=guard($('pdfEmail'),async()=>{if(!pdfOrder||!pdfDoc)return;const o=pdfOrder,res=await sendEmail(o,{d:pdfDoc,filename:pdfName});closePdf();toast(emailResultMsg(o,res,false))},e=>alert(friendly(e)));$('pdfDownload').onclick=downloadPdf;$('pdfOpen').onclick=()=>pdfUrl&&window.open(pdfUrl,'_blank');

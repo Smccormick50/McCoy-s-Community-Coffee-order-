@@ -121,3 +121,88 @@ Note: the manifest and icons make the site eligible for a branded install; brows
 ### v12.1 fix
 - Receiving can now be logged on a PO still in **Draft**, for example when someone picks Received from the status menu without marking it Sent first. Saving receiving marks it Received and locks it. **Republish `firestore.rules`.**
 - Permission errors now explain what to check instead of showing "Missing or insufficient permissions."
+
+### v12.2: PDF viewer
+- **Save & view PDF** (new orders), **View PDF** (Order history and locked POs) and **View PDF report** (PO Search) open the PDF in an on-screen viewer. Use **Download** to save it, **Open in new tab** for full screen or printing, and **Close** (or Esc) to return.
+- **Save & email PDF** still downloads the PDF automatically, so it's ready to attach.
+- On iPhone, the in-page preview may show only the first page. Use **Open in new tab** to see the whole PDF.
+- No rules change from v12.1. Upload `index.html` only.
+
+### v12.3: PO Search shows POs
+- Results show **one row per PO**: date, PO, requester, lines, units ordered, units received, value, status and receiving result (Complete, "2 short", "1 over", or Not received).
+- **Click a PO row** to expand it and see every item with ordered, received, variance (OK / Short / Over), price and variance note, plus order and receiving notes. Click again to collapse. Lines that match a product or keyword filter are highlighted.
+- **Open** goes to the full PO; **PDF** opens it in the viewer.
+- Filtering by product shows the POs containing that product, and the tiles show units and value for that product.
+- **Export Excel** has two sheets: **POs** (one row per PO) and **PO items** (every line with its variance). **View PDF report** lists POs, with variance lines in red under each affected PO.
+- Upload `index.html` only. No rules change.
+
+### v12.4: Email PDF attaches the PDF automatically
+- **On a computer:** **Save & email PDF** downloads `PO-####-email.eml`. Open it from your browser's downloads, and Outlook (or Windows Mail) opens a **draft addressed to mblackburn@communitycoffee.com** with the subject, order details and the **PDF already attached**. Press Send.
+  - Tip (Chrome/Edge): click the arrow or "..." on the downloaded .eml and choose **Always open files of this type**, so future drafts open by themselves.
+  - If .eml files open in the wrong program: right-click any .eml > Open with > Outlook > Always.
+- **On iPhone/Android:** it opens the share sheet with the PDF attached. Pick Mail or Outlook. The vendor address is copied, so paste it into To. If the share sheet doesn't appear, tap **Email PDF** in the PDF viewer that opens.
+- The PDF viewer has an **Email PDF** button too, so any PO can be emailed from Order history or PO Search.
+- The default recipient is **mblackburn@communitycoffee.com**. An admin can change it under Admin > Vendor email.
+- PDFs are now about 100 KB instead of about 9 MB (logos are compressed), so they're easy to email.
+- Upload `index.html` only. No rules change.
+
+### v12.5
+- The email draft's To line is written as `<mblackburn@communitycoffee.com>` so Outlook shows the address once. If Outlook still shows it twice, press **Check names** (Ctrl+K). Either way, the email goes to the correct address.
+
+### v12.6
+- Email drafts are addressed to **"Mark Blackburn" <mblackburn@communitycoffee.com>**, so Outlook shows his name.
+- Admin > Vendor email accepts `Name <email>` (for example `Mark Blackburn <mblackburn@communitycoffee.com>`) or a plain email. Separate multiple recipients with commas. If left blank, Mark Blackburn is the default.
+
+### v12.7
+- Email drafts **Cc Facilities Management <facilities_management@mccoys.com>** automatically (computer/Outlook drafts). On phones, the share sheet can't fill in Cc, so the app message reminds you to add it.
+
+### v12.8: export the product list
+- **Admin · Pricing > Export Excel** (next to Save product changes) downloads `Community-Coffee-Catalog-YYYY-MM-DD.xlsx` with every product on the list: Item #, Description, Section (Purchase items / Free merchandise) and Unit price. Paid items come first, then free.
+- It exports the **saved** catalog. Save any edits first if you want them included.
+- Upload `index.html` only. No rules change.
+
+### v12.9: import a spreadsheet to update the product list
+- **Admin · Pricing > Import Excel** lets you choose an .xlsx, .xls or .csv file. Easiest: click **Export Excel**, edit the file, then import it.
+- Columns: **Item #**, **Description**, **Section** (Purchase items / Free merchandise), **Unit price**. Only Item # is required. A blank Description or Price keeps the current value. New items need a description, and a price if they're purchase items.
+- A **preview** shows what will change: new products (green), updates such as "Price: $7.00 → $7.50" (yellow), and rows with problems (red), such as a duplicate Item # or a free item with a price. **Nothing is saved until you click Apply.** Rows with errors are skipped.
+- Products missing from the sheet are left unchanged; nothing is deleted. Past POs keep their original prices and names.
+- Upload `index.html` only. No rules change.
+
+### v12.10: product photos
+- Each product can have a photo, shown next to it on the **order form** and the **Admin page**. Click a photo to see it larger; click again (or Esc) to close.
+- **Add one at a time:** Admin · Pricing > **Add photo** under the product (JPG or PNG; phone camera photos work too). **Change photo** / **Remove** are there as well.
+- **Add from Excel:** put the picture in the **Item image** column on the product's row, either placed in the cell (Insert > Pictures > Place in Cell) or floating over the row with its top-left corner in that row. Then **Import Excel** (.xlsx). The preview shows each photo found, marked "Photo added" or "Photo replaced".
+- Photos are shrunk automatically (about 5-100 KB each) and saved with the product, so everyone sees them. Rows without a picture keep their current photo.
+- Export Excel does not include photos (Excel export can't hold pictures), so re-importing an exported sheet won't remove them.
+- Upload `index.html` only. No rules change.
+
+### v12.11: bigger, sharper photos
+- Click any product photo to open it **almost full screen**, with the item number, name and price underneath. Close it with the **✕**, by clicking anywhere, or with Esc.
+- Each photo is now saved at two sizes: a small one for the lists, so the order form stays fast, and a full-size one (up to 1400 px) that loads only when someone opens the photo.
+- **Publish the new `firestore.rules`.** They add a `catalogPhotos` collection for the full-size copies (admins can change them, everyone signed in can view). Without the new rules, photos still save, but only the small copy, and the app tells you.
+- Photos added before v12.11 only have the small copy. **Re-add them** (Add photo, or Import Excel again) to get the sharp full-size view.
+- Upload `index.html` to GitHub **and** publish `firestore.rules` in Firebase.
+
+## Version 13: scan delivery tickets and keep them with the PO
+
+**Deploy:** upload `index.html` to GitHub **and publish the new `firestore.rules`** in Firebase (Firestore Database > Rules > Publish). The new rules add storage for ticket files under each PO.
+
+### Scanning a delivery ticket
+- On the **receiving screen** (Log receiving / Edit receiving) there's a **Delivery ticket** box:
+  - **Scan with camera** opens the phone camera. Photograph the ticket flat, straight-on, filling the screen, in good light.
+  - **Upload PDF or photo** takes a PDF (an emailed invoice, for example) or saved photos. You can pick several pages.
+- The app reads the text **in your browser**. The first scan downloads the text reader (about 10 MB), so it takes longer. A PDF with real text is read instantly. A scanned PDF is read like a photo.
+- The text appears in an editable **Ticket text** box (the "text document"). Fix anything misread, then click **Match to PO**. **Download as .txt** saves the text as a file.
+- The comparison table shows each PO item: Ordered vs On ticket, with **Match / Short / Over**, **Check** (couldn't read it, so enter it by hand), and items **On ticket, not on PO**.
+  - Quantities are double-checked with qty × price = total where possible. When the quantity itself is smudged, the app works it out from total ÷ price.
+- **Fill received quantities from ticket** copies the readings into the Received boxes, adds "Per delivery ticket" notes on differences, and lists extra items in the receiving notes. Nothing is final until you click **Save receiving**.
+
+### Ticket files are saved with the PO (history)
+- When you save receiving, the ticket is stored **as a PDF with that PO**. An uploaded PDF is kept exactly as it was. Phone photos are combined into one PDF (one page per photo).
+- Open it any time from:
+  - **Order history** (the 📎 **Delivery ticket** button)
+  - the receiving screen (**Ticket files**)
+  - **PO Search** (open the PO row, then **Ticket files**)
+- Scanning again later **adds** another file. Earlier files are kept. Only admins can delete files (in the Firebase console).
+- The ticket text is saved with the PO too, and the receiving PDF notes that a ticket file is on record.
+- Limits: 8 MB per file. Files are stored inside the free Firestore database in pieces, because Firebase file Storage needs a paid plan. A typical ticket is 0.1-1 MB, so the free 1 GB holds hundreds to thousands.

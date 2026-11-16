@@ -91,6 +91,28 @@ service cloud.firestore {
           && changedKeys().hasOnly(['receiving', 'hasVariance', 'status', 'updatedAt', 'updatedBy']))
       );
       allow delete: if false;
+
+      // Delivery ticket files saved with a PO (stored in pieces because the free plan has no file storage).
+      // Anyone signed in can add and view them; nobody can change them; only admins can delete.
+      match /files/{fileId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.uploadedBy == request.auth.uid
+          && request.resource.data.chunks is int && request.resource.data.chunks >= 1 && request.resource.data.chunks <= 20
+          && request.resource.data.size is int && request.resource.data.size <= 10000000
+          && request.resource.data.name is string && request.resource.data.name.size() <= 200;
+        allow update: if false;
+        allow delete: if admin();
+        match /chunks/{chunkId} {
+          allow read: if signedIn();
+          allow create: if signedIn()
+            && request.resource.data.keys().hasOnly(['data'])
+            && request.resource.data.data is string
+            && request.resource.data.data.size() <= 750000;
+          allow update: if false;
+          allow delete: if admin();
+        }
+      }
     }
   }
 }
