@@ -64,6 +64,10 @@ img.thumb{cursor:zoom-in}.thumb.noimg{background:#f1f5f3;color:#9aaba2;font-size
 #imgZoom img{max-width:94vw;max-height:80vh;min-width:min(320px,90vw);object-fit:contain;background:#fff;border-radius:12px;padding:10px;box-shadow:0 10px 40px #0007}#imgZoom p{color:#fff;font-weight:700;margin:12px 0 0;text-align:center;font-size:1.05rem}#imgZoom small{color:#d6e6dd;margin-top:4px;min-height:1em;text-align:center}
 #imgZoomClose{position:fixed;top:14px;right:14px;width:46px;height:46px;border-radius:50%;padding:0;font-size:1.3rem;background:#fff;color:#00543b;box-shadow:0 4px 14px #0005}
 .file-list{list-style:none;padding:0;margin:6px 0 8px}.file-list li{padding:4px 0}.file-list a{font-weight:700;color:#00543b}button.small{padding:3px 8px;font-size:.75rem;margin-left:6px}
+.scan-box{position:relative;transition:background .15s,border-color .15s}
+.scan-box.dragging{border:2px dashed #00543b;background:#e9f5ee}
+.drop-hint{display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:1.25rem;font-weight:800;color:#00543b;background:#e9f5eeee;border-radius:12px;pointer-events:none;z-index:2}
+.scan-box.dragging .drop-hint{display:flex}
 .scan-box{border:1px dashed #b9cfc4;border-radius:12px;padding:12px;margin:12px 0;background:#f8fbf9}
 .scan-box textarea{font-family:ui-monospace,Consolas,monospace;font-size:.8rem}
 .note{background:#fff9df;border-left:4px solid #d5a521;padding:10px;border-radius:4px;font-size:.85rem}
@@ -175,8 +179,9 @@ body.noscroll{overflow:hidden}
 <section id="receive" class="panel hidden">
 <h2 id="recvTitle">Receive PO</h2>
 <p class="muted" id="recvInfo"></p>
-<div class="scan-box">
-<b>Delivery ticket</b> <span class="muted">Scan the ticket or invoice that came with the order to compare it to this PO.</span>
+<div class="scan-box" id="scanBox">
+<b>Delivery ticket</b> <span class="muted">Scan the ticket or invoice that came with the order to compare it to this PO, or <b>drag and drop</b> a PDF or photo here.</span>
+<div class="drop-hint" id="dropHint">Drop PDF or photo here</div>
 <div class="actions" style="margin-top:8px"><button type="button" class="gold" id="scanCamBtn">&#128247; Scan with camera</button><button type="button" class="secondary" id="scanFileBtn">Upload PDF or photo</button></div>
 <input type="file" id="scanCam" accept="image/*" capture="environment" class="hidden"><input type="file" id="scanFile" accept="application/pdf,image/*" multiple class="hidden">
 <p id="scanStatus" class="muted" role="status"></p>
@@ -1161,7 +1166,28 @@ $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Recei
 $('scanCamBtn').onclick=()=>{$('scanCam').value='';$('scanCam').click()};
 $('scanFileBtn').onclick=()=>{$('scanFile').value='';$('scanFile').click()};
 for(const id of ['scanCam','scanFile'])$(id).onchange=async()=>{const b1=$('scanCamBtn'),b2=$('scanFileBtn');b1.disabled=b2.disabled=true;try{await scanFiles([...$(id).files])}catch(e){console.error('Scan failed',e);scanStatus('Scan failed: '+(e.message||e),true)}finally{b1.disabled=b2.disabled=false}};
-$('scanMatchBtn').onclick=matchScan;$('scanTxtBtn').onclick=downloadScanTxt;
+$('scanMatchBtn').onclick=matchScan;
+// Drag and drop a PDF or photo onto the Delivery ticket box (or anywhere on the receiving screen).
+(()=>{
+ const box=$('scanBox'),recv=$('receive');let depth=0;
+ const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes('Files');
+ const usable=f=>/pdf$/i.test(f.type)||/\.pdf$/i.test(f.name)||/^image\//i.test(f.type)||/\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(f.name);
+ recv.addEventListener('dragenter',e=>{if(!hasFiles(e))return;e.preventDefault();depth++;box.classList.add('dragging')});
+ recv.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy'});
+ recv.addEventListener('dragleave',e=>{if(!hasFiles(e))return;depth=Math.max(0,depth-1);if(!depth)box.classList.remove('dragging')});
+ recv.addEventListener('drop',async e=>{
+  if(!hasFiles(e))return;e.preventDefault();depth=0;box.classList.remove('dragging');
+  const all=[...e.dataTransfer.files],files=all.filter(usable);
+  if(!files.length){scanStatus('That file type can\'t be read. Drop a PDF or a photo (JPG or PNG).',true);return}
+  const b1=$('scanCamBtn'),b2=$('scanFileBtn');b1.disabled=b2.disabled=true;
+  try{await scanFiles(files);if(files.length<all.length)scanStatus($('scanStatus').textContent+` (${all.length-files.length} file${all.length-files.length===1?'':'s'} skipped: not a PDF or photo.)`)}
+  catch(err){console.error('Scan failed',err);scanStatus('Scan failed: '+(err.message||err),true)}
+  finally{b1.disabled=b2.disabled=false}
+ });
+ // A file dropped anywhere else in the app shouldn't make the browser leave the app to open it.
+ window.addEventListener('dragover',e=>{if(hasFiles(e))e.preventDefault()});
+ window.addEventListener('drop',e=>{if(hasFiles(e)&&!recv.contains(e.target)){e.preventDefault();if(!recv.classList.contains('hidden'))return;toast('To scan a delivery ticket, open the PO\'s receiving screen (Log receiving), then drop the file there.')}});
+})();$('scanTxtBtn').onclick=downloadScanTxt;
 $('scanClearBtn').onclick=()=>{pendingTicketFiles=[];renderTicketFiles();$('scanText').value='';$('scanMatches').innerHTML='';$('scanResult').classList.add('hidden');scanStatus('')};
 document.addEventListener('click',async e=>{
  const s=e.target.closest('[data-file-saved]'),pd=e.target.closest('[data-file-pending]'),dr=e.target.closest('[data-file-drop]');
