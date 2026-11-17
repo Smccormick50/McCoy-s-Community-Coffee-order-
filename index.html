@@ -41,6 +41,9 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .pill.var{background:#fde8e6;color:#8a322d}
 .order{border-bottom:1px solid #e4ebe7;padding:12px 0}.order:last-child{border:0}
 .order button{margin:6px 6px 0 0;padding:8px 10px;font-size:.84rem}
+.card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.card-actions button,.card-actions select,.recv-group button{margin:0!important}
+.recv-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding:7px 9px;background:#f6faf7;border:1px solid #dbe5df;border-radius:9px}
+.recv-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64766c;margin-right:4px}
 .order select{display:inline-block;width:auto;margin:6px 0 0;padding:7px 9px;font-size:.84rem}
 .month-head{display:flex;justify-content:space-between;gap:10px;font-weight:800;color:#00543b;margin:6px 0 2px;padding-bottom:6px;border-bottom:2px solid #00543b}
 details.group{border:1px solid #dbe5df;border-radius:10px;margin:10px 0;background:#fbfdfc}
@@ -64,6 +67,9 @@ img.thumb{cursor:zoom-in}.thumb.noimg{background:#f1f5f3;color:#9aaba2;font-size
 #imgZoom img{max-width:94vw;max-height:80vh;min-width:min(320px,90vw);object-fit:contain;background:#fff;border-radius:12px;padding:10px;box-shadow:0 10px 40px #0007}#imgZoom p{color:#fff;font-weight:700;margin:12px 0 0;text-align:center;font-size:1.05rem}#imgZoom small{color:#d6e6dd;margin-top:4px;min-height:1em;text-align:center}
 #imgZoomClose{position:fixed;top:14px;right:14px;width:46px;height:46px;border-radius:50%;padding:0;font-size:1.3rem;background:#fff;color:#00543b;box-shadow:0 4px 14px #0005}
 .file-list{list-style:none;padding:0;margin:6px 0 8px}.file-list li{padding:4px 0}.file-list a{font-weight:700;color:#00543b}button.small{padding:3px 8px;font-size:.75rem;margin-left:6px}
+.recv-row.from-ticket input[type=number]{border-color:#00543b;border-width:2px}
+.recv-row.needs-check{background:#fff8e1;box-shadow:inset 0 0 0 2px #e0b100}
+.chk-tag{display:block;color:#8a5a00;font-weight:800;margin-top:3px}
 .scan-box{position:relative;transition:background .15s,border-color .15s}
 .scan-box.dragging{border:2px dashed #00543b;background:#e9f5ee}
 .drop-hint{display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:1.25rem;font-weight:800;color:#00543b;background:#e9f5eeee;border-radius:12px;pointer-events:none;z-index:2}
@@ -187,9 +193,9 @@ body.noscroll{overflow:hidden}
 <p id="scanStatus" class="muted" role="status"></p>
 <div id="ticketFiles"></div>
 <div id="scanResult" class="hidden">
-<label for="scanText">Ticket text (correct anything the scan misread, then click Match)</label>
+<label for="scanText">Ticket text (if the scan misread something, correct it here and click Re-match &amp; fill)</label>
 <textarea id="scanText" rows="8" spellcheck="false"></textarea>
-<div class="actions" style="margin-top:8px"><button type="button" id="scanMatchBtn">Match to PO</button><button type="button" class="secondary" id="scanTxtBtn">Download as .txt</button><button type="button" class="secondary" id="scanClearBtn">Clear scan</button></div>
+<div class="actions" style="margin-top:8px"><button type="button" id="scanMatchBtn" title="Use after correcting the ticket text">Re-match &amp; fill</button><button type="button" class="secondary" id="scanTxtBtn">Download as .txt</button><button type="button" class="secondary" id="scanClearBtn">Clear scan</button></div>
 <div id="scanMatches"></div>
 </div>
 </div>
@@ -393,10 +399,10 @@ async function pdf(o){
  const pair=(a,b)=>{d.text(pdfSafe(a),L,y);if(b)d.text(pdfSafe(b),R,y,{align:'right'});y+=16};
  const st=statusOf(o);
  pair('PO: '+o.poNumber,'Order date: '+fmtDate(orderDateStr(o)));
- pair('Requested by: '+o.requester,st!=='Draft'?'Status: '+st:'');
+ pair('Requested by: '+o.requester);
  const ship=d.splitTextToSize(pdfSafe('Ship to: '+(o.shipTo||'')),R-L);d.text(ship,L,y);y+=ship.length*13+3;
  pair('Vendor: Community Coffee Company, LLC');y+=8;
- const rec=o.receiving?Object.fromEntries((o.receiving.lines||[]).map(l=>[l.id,l])):null;
+ const rec=null; // The PO PDF always shows what was ordered. Receiving/variances live in the Variance PDF.
  const C=rec?{desc:96,descW:215,qty:362,rcvd:412,unit:490,ext:R}:{desc:96,descW:265,qty:412,unit:490,ext:R};
  const newPage=()=>{d.addPage();y=48;ink()};
  const header=title=>{if(y+46>BOTTOM)newPage();d.setFont('helvetica','bold');d.setFontSize(10);d.text(title,L,y);y+=16;d.setFontSize(8.5);d.text('ITEM',L,y);d.text('DESCRIPTION',C.desc,y);d.text('QTY',C.qty,y,{align:'right'});if(rec)d.text('RCVD',C.rcvd,y,{align:'right'});d.text('UNIT',C.unit,y,{align:'right'});d.text('EXTENDED',C.ext,y,{align:'right'});y+=5;d.setLineWidth(.8);d.line(L,y,R,y);y+=13;d.setFont('helvetica','normal')};
@@ -528,10 +534,15 @@ function orderCard(o){
  div.append(h);
  const det=document.createElement('div');det.className='muted';
  det.textContent=`${o.requester||''} · ${fmtDate(orderDateStr(o))}${o.sentAt?.toDate?' · sent '+o.sentAt.toDate().toLocaleDateString():''}${o.receiving?' · received '+fmtDate(o.receiving.date):''}`;div.append(det);
- const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);div.append(b1);
- const b2=document.createElement('button');b2.className='secondary';b2.textContent='View PDF';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o),o)}catch(e){alert(e.message)}};div.append(b2);
- div.append(...varianceButton(o),...ticketFileButtons(o));
- if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);div.append(b3)}
+ const row=document.createElement('div');row.className='card-actions';div.append(row);
+ const b1=document.createElement('button');b1.textContent=canEdit(o)?'View / edit':'View';b1.onclick=()=>load(o);row.append(b1);
+ const b2=document.createElement('button');b2.className='secondary';b2.textContent='PO PDF';b2.title='The purchase order as sent to Community Coffee';b2.onclick=async()=>{try{await ensurePdf();showPdf(await pdf(o),o)}catch(e){alert(e.message)}};row.append(b2);
+ if(st==='Sent'||st==='Received'||o.receiving){
+  const g=document.createElement('div');g.className='recv-group';const lab=document.createElement('span');lab.className='recv-label';lab.textContent='Receiving';g.append(lab);
+  if(st==='Sent'||st==='Received'){const b3=document.createElement('button');b3.className='gold';b3.textContent=o.receiving?'Edit receiving':'Log receiving';b3.onclick=()=>openReceiving(o);g.append(b3)}
+  g.append(...varianceButton(o),...ticketFileButtons(o));
+  div.append(g);
+ }
  const sel=document.createElement('select');sel.setAttribute('aria-label','Status for PO '+o.poNumber);
  for(const v of ['Draft','Sent','Received','Cancelled']){if(v==='Draft'&&st!=='Draft'&&!isAdmin)continue;const op=document.createElement('option');op.value=v;op.textContent=v;op.selected=st===v;sel.append(op)}
  sel.onchange=async()=>{
@@ -542,7 +553,7 @@ function orderCard(o){
   try{await setStatus(o,v);$('historyMessage').textContent=`PO ${o.poNumber} marked ${v}.`;$('historyMessage').className=''}
   catch(e){sel.value=st;$('historyMessage').textContent='Status change failed: '+friendly(e);$('historyMessage').className='error'}
  };
- div.append(sel);return div;
+ row.append(sel);return div;
 }
 function groupSummary(orders){const n=orders.length,t=orders.reduce((s,o)=>s+(Number(o.total)||0),0),v=orders.filter(o=>o.hasVariance).length;return `${n} PO${n===1?'':'s'} · ${money(t)}${v?` · ${v} with variance`:''}`}
 function makeGroup(key,label,orders,cls,forceOpen,fill){
@@ -586,7 +597,7 @@ function openReceiving(o){
  document.querySelectorAll('[data-recv]').forEach(e=>e.addEventListener('input',updateRecvSummary));
  pendingTicketFiles=[];renderTicketFiles();
  $('scanText').value=order.receiving?.ticketText||'';$('scanResult').classList.toggle('hidden',!order.receiving?.ticketText);$('scanMatches').innerHTML='';scanStatus(order.receiving?.ticketText?'A delivery ticket scan is saved with this PO.':'');
- updateRecvSummary();tab('receive');if(order.receiving?.ticketText)matchScan();
+ updateRecvSummary();tab('receive');if(order.receiving?.ticketText)matchScan(false);
 }
 function updateRecvSummary(){
  const o=receivingOrder;if(!o)return;let short=0,over=0,lines=0;
@@ -661,8 +672,7 @@ async function scanFiles(files){
  if(!t)throw Error('No text was found. Try a closer, well-lit photo with the ticket flat.');
  const box=$('scanText');box.value=(box.value.trim()?box.value.trim()+'\n\n--- next page ---\n':'')+t;
  $('scanResult').classList.remove('hidden');
- scanStatus('Text captured. The ticket file will be saved with this PO when you click Save receiving. Check the text, then see the comparison below.');
- matchScan();
+ matchScan(true);
 }
 // OCR often reads 0 as O, 1 as l/I, 5 as S, 8 as B inside numbers.
 const fixDigits=tok=>(tok.replace(/[^0-9]/g,'').length>=2||/^[OolISB0-9]+$/.test(tok))&&/\d/.test(tok)?tok.replace(/[Oo]/g,'0').replace(/[lI|]/g,'1').replace(/S/g,'5').replace(/B/g,'8'):tok;
@@ -691,7 +701,7 @@ function qtyFromLine(line,id,unitPrice){
  const pick=before[before.length-1];
  return {qty:pick.v,how:'best guess, please check'};
 }
-function matchScan(){
+function matchScan(auto=false){
  const o=receivingOrder;if(!o)return;
  const lines=$('scanText').value.split(/\n/).map(l=>l.trim()).filter(Boolean);
  const hasId=(l,id)=>normLine(l).split(/\s+/).some(t=>t.replace(/[^0-9A-Za-z_-]/g,'').replace(/^0+/,'')===String(id).replace(/^0+/,''));
@@ -706,14 +716,25 @@ function matchScan(){
  const extras=products.filter(p=>!onPo.has(p.id)&&/^\d{4,}$/.test(p.id)&&lines.some(x=>hasId(x,p.id))).map(p=>{const line=lines.find(x=>hasId(x,p.id));return {id:p.id,description:p.name,qty:qtyFromLine(line,p.id,p.price)?.qty??'?',line}});
  const st=m=>m.qty==null?['Check','bad']:m.qty===m.ordered?['Match','okc']:m.qty<m.ordered?[`Short ${m.ordered-m.qty}`,'bad']:[`Over ${m.qty-m.ordered}`,'bad'];
  $('scanMatches').innerHTML=`<table class="items" style="margin-top:10px"><thead><tr><th>Item</th><th>Description</th><th class="num">Ordered</th><th class="num">On ticket</th><th>Result</th><th>Ticket line</th></tr></thead><tbody>${scanMatchesData.map(m=>{const [t,c]=st(m);return `<tr><td>${esc(m.id)}</td><td>${esc(m.description)}</td><td class="num">${m.ordered}</td><td class="num ${m.qty!=null&&m.qty!==m.ordered?'bad':''}">${m.qty??'—'}</td><td class="${c}">${t}<br><small class="muted">${esc(m.how)}</small></td><td><small>${esc(m.line.slice(0,90))}</small></td></tr>`}).join('')}${extras.map(x=>`<tr class="imp-chg"><td>${esc(x.id)}</td><td>${esc(x.description)}</td><td class="num">0</td><td class="num bad">${esc(x.qty)}</td><td class="bad">On ticket, not on PO</td><td><small>${esc(x.line.slice(0,90))}</small></td></tr>`).join('')}</tbody></table>
- <div class="actions" style="margin-top:10px"><button type="button" class="gold" id="scanFillBtn" ${scanMatchesData.some(m=>m.qty!=null)?'':'disabled'}>Fill received quantities from ticket</button></div>
- <p class="muted" style="font-size:.82rem">Items marked "Check" were not read clearly. Enter those by hand. ${extras.length?'Items "On ticket, not on PO" are added to the receiving notes when you fill.':''}</p>`;
- $('scanFillBtn').onclick=()=>{
-  let n=0;for(const m of scanMatchesData){if(m.qty==null)continue;const inp=byData('data-recv',m.id);if(inp){inp.value=m.qty;n++}const note=byData('data-note',m.id);if(note&&m.qty!==m.ordered&&!note.value.trim())note.value='Per delivery ticket: '+m.qty}
-  if(extras.length){const add=extras.map(x=>`Extra on ticket: ${x.id} ${x.description} qty ${x.qty}`).join('\n');if(!$('recvNotes').value.includes(add))$('recvNotes').value=($('recvNotes').value.trim()+'\n'+add).trim()}
-  updateRecvSummary();scanStatus(`Filled ${n} received quantit${n===1?'y':'ies'} from the ticket. Check them, then Save receiving.`);
-  $('recvLines').scrollIntoView({behavior:'smooth',block:'start'});
- };
+ <p class="muted" style="font-size:.82rem">${auto?'The Received boxes below were filled in from the ticket. ':''}Lines marked <b>Check</b> weren't read clearly and are highlighted below. Their Received box was left as ordered, so confirm them by hand.${extras.length?' Items "On ticket, not on PO" were added to the receiving notes.':''}</p>`;
+ scanExtras=extras;
+ if(auto)fillFromScan();
+}
+let scanExtras=[];
+// Copies the ticket readings into the receiving form. Nothing is saved until Save receiving.
+function fillFromScan(){
+ let n=0,chk=0;
+ for(const m of scanMatchesData){
+  const row=byData('data-row',m.id);row?.classList.remove('needs-check','from-ticket');row?.querySelector('.chk-tag')?.remove();
+  const inp=byData('data-recv',m.id),note=byData('data-note',m.id);
+  if(m.qty==null){chk++;if(row){row.classList.add('needs-check');const t=document.createElement('small');t.className='chk-tag';t.textContent='⚠ Check: not read clearly from the ticket';row.firstElementChild.append(t)}continue}
+  if(inp){inp.value=m.qty;n++;row?.classList.add('from-ticket')}
+  if(note){const auto=/^Per delivery ticket: \d+$/.test(note.value.trim());if(m.qty!==m.ordered&&(!note.value.trim()||auto))note.value='Per delivery ticket: '+m.qty;else if(m.qty===m.ordered&&auto)note.value=''}
+ }
+ if(scanExtras.length){const add=scanExtras.map(x=>`Extra on ticket: ${x.id} ${x.description} qty ${x.qty}`).join('\n');if(!$('recvNotes').value.includes(add))$('recvNotes').value=($('recvNotes').value.trim()+'\n'+add).trim()}
+ updateRecvSummary();
+ scanStatus(`Receiving filled in from the ticket: ${n} line${n===1?'':'s'} read`+(chk?`, ${chk} to check by hand (highlighted)`:'')+'. Review below, then click Save receiving.');
+ $('recvLines').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function downloadScanTxt(){
  const o=receivingOrder;const t=$('scanText').value;if(!t.trim())return;
@@ -907,7 +928,7 @@ function renderSearchTable(f){
   tr.innerHTML=`<td class="caret">${open?'&#9662;':'&#9656;'}</td><td>${esc(fmtDate(r.date))}</td><td><b>${esc(o.poNumber)}</b></td><td>${esc(o.requester)}</td><td class="num">${r.lineCount}</td><td class="num">${r.units}</td><td class="num${r.rcvdUnits!=null&&r.rcvdUnits!==r.units?' bad':''}">${r.rcvdUnits==null?'—':r.rcvdUnits}</td><td class="num">${money(r.value)}</td><td><span class="pill ${esc(r.st)}" style="margin:0">${esc(r.st)}</span></td><td class="rs ${r.rs.cls}">${esc(r.rs.text)}</td><td class="acts"></td>`;
   const acts=tr.lastElementChild;
   const bOpen=document.createElement('button');bOpen.textContent='Open';bOpen.onclick=e=>{e.stopPropagation();load(o)};
-  const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o),o)}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
+  const bPdf=document.createElement('button');bPdf.className='secondary';bPdf.textContent='PO PDF';bPdf.onclick=async e=>{e.stopPropagation();try{await ensurePdf();showPdf(await pdf(o),o)}catch(err){$('searchMessage').textContent=err.message;$('searchMessage').className='error'}};
   acts.append(bOpen,bPdf,...varianceButton(o));
   const toggle=()=>{open?searchExpanded.delete(o.id):searchExpanded.add(o.id);renderSearchTable(f)};
   tr.onclick=toggle;tr.title=open?'Click to hide items':'Click to show items';
@@ -1244,7 +1265,7 @@ $('recvSave').onclick=guard($('recvSave'),saveReceiving,e=>{console.error('Recei
 $('scanCamBtn').onclick=()=>{$('scanCam').value='';$('scanCam').click()};
 $('scanFileBtn').onclick=()=>{$('scanFile').value='';$('scanFile').click()};
 for(const id of ['scanCam','scanFile'])$(id).onchange=async()=>{const b1=$('scanCamBtn'),b2=$('scanFileBtn');b1.disabled=b2.disabled=true;try{await scanFiles([...$(id).files])}catch(e){console.error('Scan failed',e);scanStatus('Scan failed: '+(e.message||e),true)}finally{b1.disabled=b2.disabled=false}};
-$('scanMatchBtn').onclick=matchScan;
+$('scanMatchBtn').onclick=()=>matchScan(true);
 // Drag and drop a PDF or photo onto the Delivery ticket box (or anywhere on the receiving screen).
 (()=>{
  const box=$('scanBox'),recv=$('receive');let depth=0;
